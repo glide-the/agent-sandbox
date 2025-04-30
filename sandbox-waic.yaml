@@ -1,0 +1,28 @@
+ # Copyright (c) 2022, salesforce.com, inc.
+ # All rights reserved.
+ # SPDX-License-Identifier: BSD-3-Clause
+ # For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+
+preprocess:
+    - sandbox_started_processor:
+          name: "sandbox_started_processor"
+          cwd: "/app/sandbox"
+
+tasks:
+  - sandbox_eval_task:
+      name: "sandbox_eval_task"
+      preprocess:
+        - sandbox_started_processor:
+            processor: "sandbox_started_processor"
+            processor_name: "Sandbox"
+
+
+bootstrap:
+  - runner_bootstrap_web:
+      name: "runner_bootstrap_web"
+      host: "0.0.0.0"
+      port: 10001
+      max_ongoing_tasks: 2
+      web_client_timeout: 3600
+      finished_task_remove_timeout: 100
+

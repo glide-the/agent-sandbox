@@ -18,26 +18,31 @@
     
 5.  填写input\_param.json标准答案和测试提交文件，例如：
     
-    {
-      "fileData":{
-        "evaluatorDir":"",
-        "evaluatorPath":"",
-        "standardFileDir":"",
-        "standardFilePath":"answer.txt",
-        "userFileDir":"",
-        "userFilePath":"submit.txt"
-      }
-    }
+```
+{
+  "fileData":{
+    "evaluatorDir":"",
+    "evaluatorPath":"",
+    "standardFileDir":"",
+    "standardFilePath":"answer.txt",
+    "userFileDir":"",
+    "userFilePath":"submit.txt"
+  }
+}
+```
     
 1.  如有特殊的包需要额外安装，请在评测配置页面requirements输入框中进行填写，每个包名称后需进行换行。
     
 2.  本地测试评测程序，运行结束查看eval\_result.json结果是否正常：
-    
 
-    python3 evaluate.py input_param.json eval_result.json
+
+```
+python3 evaluate.py input_param.json eval_result.json
+```
 
 1.  重新打包为压缩包，必须包含修改后的evaluate.py打分逻辑文件和启动文件py\_entrance.sh(无须修改demo中的py\_entrance.sh)，文件树状结构如下所示：
     
+```text
 
 ——eval.zip
 
@@ -47,6 +52,7 @@
 
 ——...（其他包含中间过程函数的python文件）
 
+```
 2.  将评测程序、参考输入和标准答案在天池大赛系统的评测配置页面进行提交即可完成一次测试。如果测试记录状态为“成功”可点击“发布”按钮提交审核；如果测试失败，请根据测试记录提供的错误信息和详情对打分逻辑代码进行修改。
     
 
@@ -56,9 +62,12 @@
 
 当选手提交了结果文件或者选手代码预测生成了结果文件后，天池平台的打分服务，会这样触发调用：
 
-    sh py_entrance.sh input_param.json eval_result.json
+```shell
+sh py_entrance.sh input_param.json eval_result.json
+```
 
 其中第一个参数input\_param.json文件，用于在打分逻辑代码中读取评测标准答案和选手提交文件，内容示例如下（**该文件请勿自行增加字段**）：
+```text
 
     {
       "fileData":{
@@ -71,6 +80,7 @@
       }
     }
 
+```
 第二个参数eval\_result.json，表示评测程序应该把结果写入这个文件。
 
 **注意：**
@@ -78,25 +88,29 @@
 *   以上两个文件仅在本地自测时使用，正式对选手提交文件进行评测时，内容均会动态生成
     
 *   打分逻辑程序（evaluate.py）不需要关注具体的名称，直接取值即可：
-    
+```python
 
-    input_file  = open(sys.argv[1])
-    input_param = json.load(input_file)
-    
-    # 答案文件路径 the path of ground truth
-    standard_file = input_param['fileData']['standardFilePath']
-    # 用户提交文件路径 the path of submission
-    user_file     = input_param['fileData']['userFilePath']
+input_file  = open(sys.argv[1])
+input_param = json.load(input_file)
+
+# 答案文件路径 the path of ground truth
+standard_file = input_param['fileData']['standardFilePath']
+# 用户提交文件路径 the path of submission
+user_file     = input_param['fileData']['userFilePath']
+```
     
 *   针对结果文件：
     
+```text
 
-    output_file = open(sys.argv[2], 'w')
+output_file = open(sys.argv[2], 'w')
+```
 
 #### 2.输出结果的规范
 
 *   评测成功的输出：
-    
+```text
+
     {
       "score": 1.0,  # 这个score是必须的，请勿删除并改为其他名称
       "scoreJson": {
@@ -106,9 +120,12 @@
       },
       "success": true
     }
+```
     
 *   评测错误的输出：
-    
+
+```text
+
 
     {
       "errorDetail": "user input is wrong, please check !",
@@ -119,35 +136,38 @@
       "success": false
     }
 
+```
 #### 3.打分程序注意事项
 
 *   需要解压答案和选手文件的情况
     
 
 目前打分程序在容器运行的逻辑是，下载评测代码、标准答案、选手答案，为root用户运行；**解压到当前目录下（标准答案：**./standard/**）（提交文件：./submit/）；****同时针对选手答案的解压，如果发现该目录已经存在，一定要先删除并再解压！**示例代码如下：
+```python
 
-    import zipfile
-    import os
-    import logging
-    import shutil
-    
-    ......
-    
-    # standard_file 代表标准答案的路径
-    if os.path.isdir('./standard') and len(os.listdir('./standard')) > 0:
-      	logging.info("no need to unzip %s", standard_file)
-    else:
-        with zipfile.ZipFile(standard_file, "r") as zip_ref:
-            zip_ref.extractall("./standard")
-            zip_ref.close()
-    
-    # submit_file 表示选手提交的文件路径
-    submit_file_dir = os.path.join("./submit/")
-    if os.path.isdir(submit_file_dir):
-        shutil.rmtree(submit_file_dir)
-    with zipfile.ZipFile(submit_file, "r") as zip_data:
-        zip_data.extractall(submit_file_dir)
-        zip_data.close()
+import zipfile
+import os
+import logging
+import shutil
+
+......
+
+# standard_file 代表标准答案的路径
+if os.path.isdir('./standard') and len(os.listdir('./standard')) > 0:
+    logging.info("no need to unzip %s", standard_file)
+else:
+    with zipfile.ZipFile(standard_file, "r") as zip_ref:
+        zip_ref.extractall("./standard")
+        zip_ref.close()
+
+# submit_file 表示选手提交的文件路径
+submit_file_dir = os.path.join("./submit/")
+if os.path.isdir(submit_file_dir):
+    shutil.rmtree(submit_file_dir)
+with zipfile.ZipFile(submit_file, "r") as zip_data:
+    zip_data.extractall(submit_file_dir)
+    zip_data.close()
+```
 
 *   请注意需要多次测试评测程序，以保证能涵盖选手提交情况进而给出选手适当的错误信息。测试情况包括但不限于：提交格式不符合要求；提交条数有缺失；重复数据提交数据有0，Null，空格；评测指标存在分母为0的情况；使用log时注意检查负数；提交全错数据；提交全对数据；提交正常答案。
     
@@ -155,6 +175,7 @@
 
 
 ### 评测运行环境已安装的python包列表
+```text
 
 Package              Version     Editable project location
 -------------------- ----------- ----------------------------
@@ -251,3 +272,5 @@ win32_setctime       1.2.0
 xxhash               3.5.0
 yarl                 1.19.0 
 zipfile36            0.1.3
+
+```
