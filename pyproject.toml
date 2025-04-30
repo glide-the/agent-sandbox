@@ -1,0 +1,144 @@
+[tool.poetry]
+name = "zhipuai-sandbox"
+version = "0.1.0"
+description = ""
+readme = "README.md"
+authors = ['glide the <dmeck@suoxya.com>']
+license = "MIT"
+
+packages = [
+    {include = "sandbox"},
+]
+include = [
+    {path = "sandbox.yaml"},
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+#torch = "2.0.1"
+#torchaudio = "2.0.2"
+#transformers = ">=4.32.0"
+#sentencepiece = "~=0.1.99"
+
+# config manage
+omegaconf = "2.0.6"
+pydantic = "~=2.5.0"
+openai = "~=1.75.0"
+
+# log
+colorama = ">=0.4.5"
+
+# server
+nest-asyncio = "1.5.6"
+fastapi = "==0.109.2"
+uvicorn = ">=0.27.0.post1"
+pandas = "~2.0.3"
+openpyxl = "~3.1.5"
+python-multipart = "*"
+jieba = "~0.42.1"
+nltk = "~3.8.1"
+text2vec = "~1.2.9"
+modelscope = ">=1.9.0"
+jionlp = "~1.5.6"
+jsonlines = "~4.0.0"
+numpy = "~1.24.4"
+pillow = "11.1.0"
+python-dotenv = "^1.0.0"
+pymilvus = "~2.3.6"
+requests = "~2.31.0"
+tqdm = "~4.66.1"
+elasticsearch = "~7.11.0"
+simplejson = "~3.19.2"
+urllib3 = "~1.26.18"
+certifi = "~2023.11.17"
+# 将https://github.com/wbond/oscrypto/archive/d5f3437ed24257895ae1edd9e503cfb352e635a8.zip"加入到依赖中
+
+oscrypto = {url = "https://github.com/wbond/oscrypto/archive/d5f3437ed24257895ae1edd9e503cfb352e635a8.zip"}
+
+
+[tool.poetry.group.lint]
+optional = true
+
+[tool.poetry.group.lint.dependencies]
+ruff = "^0.1.5"
+
+
+[tool.poetry.group.codespell]
+optional = true
+
+[tool.poetry.group.codespell.dependencies]
+codespell = "^2.2.0"
+
+
+
+
+[tool.ruff]
+exclude = [
+    "tests/examples/non-utf8-encoding.py",
+    "tests/integration_tests/examples/non-utf8-encoding.py",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle
+    "F",  # pyflakes
+    "I",  # isort
+    "T201", # print
+]
+
+[tool.mypy]
+ignore_missing_imports = "True"
+disallow_untyped_defs = "True"
+exclude = ["notebooks", "examples", "example_data"]
+
+[tool.coverage.run]
+omit = [
+    "tests/*",
+]
+
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-plugin-pypi-mirror==0.4.2"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+# --strict-markers will raise errors on unknown marks.
+# https://docs.pytest.org/en/7.1.x/how-to/mark.html#raising-errors-on-unknown-marks
+#
+# https://docs.pytest.org/en/7.1.x/reference/reference.html
+# --strict-config       any warnings encountered while parsing the `pytest`
+#                       section of the configuration file raise errors.
+#
+# https://github.com/tophat/syrupy
+# --snapshot-warn-unused    Prints a warning on unused snapshots rather than fail the test suite.
+addopts = "--strict-markers --strict-config --durations=5 -svv"
+# Registering custom markers.
+# https://docs.pytest.org/en/7.1.x/example/markers.html#registering-markers
+markers = [
+    "requires: mark tests as requiring a specific library",
+    "scheduled: mark tests to run in scheduled testing",
+    "compile: mark placeholder test used to compile integration tests without running them"
+]
+# asyncio_mode = "auto"
+
+
+[tool.codespell]
+skip = '.git,*.pdf,*.svg,*.pdf,*.yaml,*.ipynb,poetry.lock,*.min.js,*.css,package-lock.json,example_data,_dist,examples,*.trig,*.json,*.md,*.html,*.txt,*.csv'
+# Ignore latin etc
+ignore-regex = '.*(Stati Uniti|Tense=Pres).*'
+# whats is a typo but used frequently in queries so kept as is
+# aapply - async apply
+# unsecure - typo but part of API, decided to not bother for now
+ignore-words-list = 'momento,collison,ned,foor,reworkd,parth,whats,aapply,mysogyny,unsecure,damon,crate,aadd,symbl,precesses,accademia,nin'
+
+[tool.poetry.plugins.dotenv]
+ignore = "false"
+dotenv = "dotenv:plugin"
+
+
+# https://python-poetry.org/docs/repositories/
+[[tool.poetry.source]]
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+priority = "primary"
