@@ -7,6 +7,15 @@ preprocess:
     - sandbox_started_processor:
           name: "sandbox_started_processor"
           cwd: "/app/sandbox"
+    - agent_mem0_processor:
+          name: "agent_mem0_processor"
+          cwd: "/app/sandbox"
+    - agent_workspace_l2_processor:
+          name: "agent_workspace_l2_processor"
+          cwd: "/app/sandbox"
+    - agent_workspace_l3_processor:
+          name: "agent_workspace_l3_processor"
+          cwd: "/app/sandbox"
 
 tasks:
   - sandbox_eval_task:
@@ -15,6 +24,24 @@ tasks:
         - sandbox_started_processor:
             processor: "sandbox_started_processor"
             processor_name: "Sandbox"
+  - agent_mem0_task:
+      name: "agent_mem0_task"
+      preprocess:
+        - mem0:
+            processor: "agent_mem0_processor"
+            processor_name: "AgentMem0"
+  - agent_workspace_l2_task:
+      name: "agent_workspace_l2_task"
+      preprocess:
+        - l2:
+            processor: "agent_workspace_l2_processor"
+            processor_name: "AgentWorkspaceL2"
+  - agent_workspace_l3_task:
+      name: "agent_workspace_l3_task"
+      preprocess:
+        - l3:
+            processor: "agent_workspace_l3_processor"
+            processor_name: "AgentWorkspaceL3"
 
 
 bootstrap:
