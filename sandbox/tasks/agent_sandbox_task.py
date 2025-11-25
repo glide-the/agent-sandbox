@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from typing import Dict
 
@@ -8,9 +9,16 @@ from sandbox.processors.agent_sandbox import (
     AgentWorkspaceL2ProcessorData,
     AgentWorkspaceL3ProcessorData,
 )
+from sandbox.server.model.flow_data import PayLoad
 from sandbox.tasks import FlowData, Runner, SandboxTaskAbstract
 
 logger = logging.getLogger("agent_sandbox_task")
+
+
+def calculate_md5(input_string):
+    md5_hash = hashlib.md5()
+    md5_hash.update(input_string.encode('utf-8'))
+    return md5_hash.hexdigest()
 
 
 class AgentMem0FlowData(FlowData):
@@ -60,6 +68,32 @@ class AgentMem0Task(SandboxTaskAbstract):
                 preprocess_dict[preprocess_info.processor_name] = preprocess_object
         return cls(preprocess_dict=preprocess_dict)
 
+    @classmethod
+    def prepare(cls, payload: PayLoad) -> Runner:
+        """
+        Prepare AgentMem0 task runner
+        """
+        params = payload.payload
+        # Extract mem0 input data from payload
+        mem0_input_data = params.get("mem0_input", {})
+
+        # Create AgentMem0ProcessorData instance
+        mem0_input = AgentMem0ProcessorData(**mem0_input_data)
+
+        # Create FlowData instance
+        flow_data = AgentMem0FlowData(mem0_input=mem0_input)
+
+        # Generate unique task_id
+        task_id = f'{mem0_input.user_id}_{int(payload.created_at)}_{calculate_md5(str(mem0_input))}'
+
+        # Create and return Runner instance
+        runner = Runner(
+            task_id=task_id,
+            flow_data=flow_data
+        )
+
+        return runner
+
     async def dispatch(self, runner: Runner) -> None:
         try:
             logger.info("agent_mem0_task.dispatch")
@@ -71,7 +105,7 @@ class AgentMem0Task(SandboxTaskAbstract):
 
             data = runner.flow_data
             if "AgentMem0FlowData" in data.type:
-                preprocess_object = self.preprocess_dict.get(data.mem0_input.type)
+                preprocess_object = self._preprocess_dict.get(data.mem0_input.type)
                 if not preprocess_object or not preprocess_object.match(data.mem0_input):
                     raise RuntimeError("不支持的 agent_mem0 processor")
 
@@ -123,6 +157,32 @@ class AgentWorkspaceL2Task(SandboxTaskAbstract):
                 preprocess_dict[preprocess_info.processor_name] = preprocess_object
         return cls(preprocess_dict=preprocess_dict)
 
+    @classmethod
+    def prepare(cls, payload: PayLoad) -> Runner:
+        """
+        Prepare AgentWorkspaceL2 task runner
+        """
+        params = payload.payload
+        # Extract L2 workspace input data from payload
+        l2_input_data = params.get("l2_input", {})
+
+        # Create AgentWorkspaceL2ProcessorData instance
+        l2_input = AgentWorkspaceL2ProcessorData(**l2_input_data)
+
+        # Create FlowData instance
+        flow_data = AgentWorkspaceL2FlowData(l2_input=l2_input)
+
+        # Generate unique task_id
+        task_id = f'{l2_input.user_id}_{int(payload.created_at)}_{calculate_md5(str(l2_input))}'
+
+        # Create and return Runner instance
+        runner = Runner(
+            task_id=task_id,
+            flow_data=flow_data
+        )
+
+        return runner
+
     async def dispatch(self, runner: Runner) -> None:
         try:
             logger.info("agent_workspace_l2_task.dispatch")
@@ -134,7 +194,7 @@ class AgentWorkspaceL2Task(SandboxTaskAbstract):
 
             data = runner.flow_data
             if "AgentWorkspaceL2FlowData" in data.type:
-                preprocess_object = self.preprocess_dict.get(data.l2_input.type)
+                preprocess_object = self._preprocess_dict.get(data.l2_input.type)
                 if not preprocess_object or not preprocess_object.match(data.l2_input):
                     raise RuntimeError("不支持的 agent_workspace_l2 processor")
 
@@ -186,6 +246,32 @@ class AgentWorkspaceL3Task(SandboxTaskAbstract):
                 preprocess_dict[preprocess_info.processor_name] = preprocess_object
         return cls(preprocess_dict=preprocess_dict)
 
+    @classmethod
+    def prepare(cls, payload: PayLoad) -> Runner:
+        """
+        Prepare AgentWorkspaceL3 task runner
+        """
+        params = payload.payload
+        # Extract L3 workspace input data from payload
+        l3_input_data = params.get("l3_input", {})
+
+        # Create AgentWorkspaceL3ProcessorData instance
+        l3_input = AgentWorkspaceL3ProcessorData(**l3_input_data)
+
+        # Create FlowData instance
+        flow_data = AgentWorkspaceL3FlowData(l3_input=l3_input)
+
+        # Generate unique task_id
+        task_id = f'{l3_input.user_id}_{int(payload.created_at)}_{calculate_md5(str(l3_input))}'
+
+        # Create and return Runner instance
+        runner = Runner(
+            task_id=task_id,
+            flow_data=flow_data
+        )
+
+        return runner
+
     async def dispatch(self, runner: Runner) -> None:
         try:
             logger.info("agent_workspace_l3_task.dispatch")
@@ -197,7 +283,7 @@ class AgentWorkspaceL3Task(SandboxTaskAbstract):
 
             data = runner.flow_data
             if "AgentWorkspaceL3FlowData" in data.type:
-                preprocess_object = self.preprocess_dict.get(data.l3_input.type)
+                preprocess_object = self._preprocess_dict.get(data.l3_input.type)
                 if not preprocess_object or not preprocess_object.match(data.l3_input):
                     raise RuntimeError("不支持的 agent_workspace_l3 processor")
 

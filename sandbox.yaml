@@ -6,16 +6,16 @@
 preprocess:
     - sandbox_started_processor:
           name: "sandbox_started_processor"
-          cwd: "/app/sandbox"
+          cwd: "/Users/dmeck/sandbox"
     - agent_mem0_processor:
           name: "agent_mem0_processor"
-          cwd: "/app/sandbox"
+          cwd: "/Users/dmeck/sandbox"
     - agent_workspace_l2_processor:
           name: "agent_workspace_l2_processor"
-          cwd: "/app/sandbox"
+          cwd: "/Users/dmeck/sandbox"
     - agent_workspace_l3_processor:
           name: "agent_workspace_l3_processor"
-          cwd: "/app/sandbox"
+          cwd: "/Users/dmeck/sandbox"
 
 tasks:
   - sandbox_eval_task:

@@ -74,7 +74,7 @@ class AgentMem0Processor(BaseProcessor):
             data.mem0_endpoint,
             headers=headers,
             json=payload,
-            timeout=60,
+            timeout=9999,
         )
         resp.raise_for_status()
         result_json = resp.json()
