@@ -5,11 +5,19 @@ import numpy as np
 from sandbox.common.registry import registry
 from sandbox.tasks.base_task import BaseTask, FlowData, Runner, SandboxTaskAbstract
 from sandbox.tasks.sanbox_eval_task import SandboxEvalFlowData
+from sandbox.tasks.agent_sandbox_task import (
+    AgentMem0FlowData,
+    AgentWorkspaceL2FlowData,
+    AgentWorkspaceL3FlowData,
+)
 
 __all__ = [
     "BaseTask",
     "SandboxTaskAbstract",
     "SandboxEvalFlowData",
+    "AgentMem0FlowData",
+    "AgentWorkspaceL2FlowData",
+    "AgentWorkspaceL3FlowData",
     "Runner",
     "FlowData",
     "load_task",
