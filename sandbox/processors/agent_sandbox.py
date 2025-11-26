@@ -142,7 +142,7 @@ async def run_kode_workflow(
 
     from subprocess import PIPE
 
-    cmd = ["kode", "workflow", workflow_name, "--output", result_path]
+    cmd = ["kode",  workflow_name, "--output", result_path]
     logger.info(f"Running kode workflow: {' '.join(cmd)} in {user_workspace}")
 
     async with await anyio.open_process(
