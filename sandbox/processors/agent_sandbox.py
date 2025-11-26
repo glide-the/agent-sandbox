@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
@@ -217,6 +218,26 @@ class AgentWorkspaceL2Processor(BaseProcessor):
     async def _call_kode(self, data: AgentWorkspaceL2ProcessorData):
         user_workspace = os.path.join(self.cwd, data.workspace_dir, data.user_id)
         os.makedirs(user_workspace, exist_ok=True)
+
+        src_memory_dis = os.path.join(self.cwd, data.workspace_dir, "memory_dis")
+        dst_memory_dis = os.path.join(user_workspace, "memory_dis")
+
+        try:
+            if os.path.exists(src_memory_dis):
+                if os.path.exists(dst_memory_dis):
+                    shutil.rmtree(dst_memory_dis)
+                shutil.copytree(src_memory_dis, dst_memory_dis)
+                logger.info(
+                    "Initialized user memory_dis: %s -> %s",
+                    src_memory_dis,
+                    dst_memory_dis,
+                )
+            else:
+                logger.warning(
+                    "Global memory_dis not found, skip copy: %s", src_memory_dis
+                )
+        except Exception as e:  # pragma: no cover - logging only
+            logger.warning("Failed to init user memory_dis: %s", e)
 
         result_path = os.path.join(user_workspace, data.result_filename)
         log_detail_path = os.path.join(self.cwd, data.logDetailPath)
