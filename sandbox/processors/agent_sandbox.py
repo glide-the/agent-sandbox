@@ -1,9 +1,11 @@
-import asyncio
 import json
 import logging
 import os
 import shutil
+import asyncio
+import time   # 新增：用于时间戳和耗时
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import anyio
@@ -134,8 +136,10 @@ class AgentWorkspaceL3ProcessorData(ProcessorData):
 async def run_kode_workflow(
     user_workspace: str,
     workflow_name: str,
-    result_path: str,
+    log_run_path: Optional[str] = None,
     env: Optional[Dict[str, str]] = None,
+    mcp_endpoint: Optional[str] = None,
+    mcp_connection_id: Optional[str] = None,
 ):
     """
     Launch a kode workflow within the given user workspace.
@@ -143,8 +147,44 @@ async def run_kode_workflow(
 
     from subprocess import PIPE
 
-    cmd = ["kode",  workflow_name, "--output", result_path]
+    # Execute kode mcp add-sse command if mcp_endpoint and mcp_connection_id are provided
+    if mcp_endpoint and mcp_connection_id:
+        import subprocess
+        mcp_cmd = ["kode", "mcp", "add-sse", mcp_connection_id, mcp_endpoint]
+        logger.info(f"Running MCP setup: {' '.join(mcp_cmd)} in {user_workspace}")
+        try:
+            subprocess.run(mcp_cmd, cwd=user_workspace, check=True, capture_output=True, text=True)
+            logger.info(f"MCP setup completed for connection {mcp_connection_id}")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"MCP setup failed: {e}")
+            raise RuntimeError(f"kode mcp add-sse command failed: {e}")
+
+    cmd = ["kode",  workflow_name]
     logger.info(f"Running kode workflow: {' '.join(cmd)} in {user_workspace}")
+
+    # Setup file logging if log_run_path is provided
+    file_handler = None
+    if log_run_path:
+        # Ensure log directory exists
+        log_dir = os.path.dirname(log_run_path)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+
+        # Create file handler for dynamic logging
+        file_handler = logging.FileHandler(log_run_path, mode='a', encoding='utf-8')
+        file_handler.setLevel(logging.INFO)
+
+        # Create formatter for file logs
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        file_handler.setFormatter(formatter)
+
+        # Add file handler to logger
+        logger.addHandler(file_handler)
+
+        # Write initial log entry
+        logger.info(f"Starting kode workflow logging to: {log_run_path}")
 
     async with await anyio.open_process(
         cmd,
@@ -153,7 +193,7 @@ async def run_kode_workflow(
         stderr=PIPE,
         env=env,
     ) as process:
-        last_output_time = 0.0
+        last_output_time = time.time()
         silence_timeout = 300
 
         async def stream_reader(stream, label: str):
@@ -163,9 +203,37 @@ async def run_kode_workflow(
                     stream, encoding="utf-8", errors="replace"
                 ):
                     last_output_time = anyio.current_time()
-                    logger.info(f"[{user_workspace}] [{label}] {line.strip()}")
+                    log_msg = f"[{user_workspace}] [{label}] {line.strip()}"
+                    logger.info(log_msg)
+                    # Also write to file if available
+                    if file_handler:
+                        file_handler.emit(
+                            logging.LogRecord(
+                                name="agent_sandbox",
+                                level=logging.INFO,
+                                pathname="",
+                                lineno=0,
+                                msg=log_msg,
+                                args=(),
+                                exc_info=None
+                            )
+                        )
             except Exception as e:  # pragma: no cover - logging only
-                logger.warning(f"[{user_workspace}] [{label}] reader failed: {e}")
+                warning_msg = f"[{user_workspace}] [{label}] reader failed: {e}"
+                logger.warning(warning_msg)
+                # Also write to file if available
+                if file_handler:
+                    file_handler.emit(
+                        logging.LogRecord(
+                            name="agent_sandbox",
+                            level=logging.WARNING,
+                            pathname="",
+                            lineno=0,
+                            msg=warning_msg,
+                            args=(),
+                            exc_info=None
+                        )
+                    )
 
         async def watchdog():
             while True:
@@ -173,24 +241,72 @@ async def run_kode_workflow(
                 if process.returncode is not None:
                     break
                 if anyio.current_time() - last_output_time > silence_timeout:
-                    logger.warning(
+                    warning_msg = (
                         f"No log output for {silence_timeout} seconds, terminating process."
                     )
+                    logger.warning(warning_msg)
+                    # Also write to file if available
+                    if file_handler:
+                        file_handler.emit(
+                            logging.LogRecord(
+                                name="agent_sandbox",
+                                level=logging.WARNING,
+                                pathname="",
+                                lineno=0,
+                                msg=warning_msg,
+                                args=(),
+                                exc_info=None
+                            )
+                        )
                     process.terminate()
                     break
 
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(stream_reader, process.stdout, "STDOUT")
-            tg.start_soon(stream_reader, process.stderr, "STDERR")
-            tg.start_soon(watchdog)
-            yield
+        try:
+            async with anyio.create_task_group() as tg:
+                tg.start_soon(stream_reader, process.stdout, "STDOUT")
+                tg.start_soon(stream_reader, process.stderr, "STDERR")
+                tg.start_soon(watchdog)
+                yield
 
-        await process.wait()
-        logger.info(f"Kode workflow exited with code {process.returncode}")
-        if process.returncode != 0:
-            raise RuntimeError(
-                "Kode workflow failed or was terminated due to silence."
-            )
+            await process.wait()
+            exit_msg = f"Kode workflow exited with code {process.returncode}"
+            logger.info(exit_msg)
+            # Also write to file if available
+            if file_handler:
+                file_handler.emit(
+                    logging.LogRecord(
+                        name="agent_sandbox",
+                        level=logging.INFO,
+                        pathname="",
+                        lineno=0,
+                        msg=exit_msg,
+                        args=(),
+                        exc_info=None
+                    )
+                )
+
+            if process.returncode != 0:
+                error_msg = "Kode workflow failed or was terminated due to silence."
+                # Also write to file if available
+                if file_handler:
+                    file_handler.emit(
+                        logging.LogRecord(
+                            name="agent_sandbox",
+                            level=logging.ERROR,
+                            pathname="",
+                            lineno=0,
+                            msg=error_msg,
+                            args=(),
+                            exc_info=None
+                        )
+                    )
+                raise RuntimeError(error_msg)
+        finally:
+            # Clean up file handler
+            if file_handler:
+                file_handler.flush()
+                file_handler.close()
+                logger.removeHandler(file_handler)
 
 
 @registry.register_processor("agent_workspace_l2_processor")
@@ -216,9 +332,16 @@ class AgentWorkspaceL2Processor(BaseProcessor):
         return "AgentWorkspaceL2" in data.type
 
     async def _call_kode(self, data: AgentWorkspaceL2ProcessorData):
+        # Handle paths similar to _call_sandbox_start method
+        # 1. 计算用户工作空间目录
         user_workspace = os.path.join(self.cwd, data.workspace_dir, data.user_id)
         os.makedirs(user_workspace, exist_ok=True)
 
+        data.logDetailPath = (Path(user_workspace) / data.logDetailPath).as_posix()
+        data.logSummaryPath = (Path(user_workspace) / data.logSummaryPath).as_posix()
+        data.logRunPath = (Path(user_workspace) / data.logRunPath).as_posix()
+
+        # 2. 初始化 memory_dis：从全局 workspace/memory_dis 拷贝到 user_workspace/memory_dis
         src_memory_dis = os.path.join(self.cwd, data.workspace_dir, "memory_dis")
         dst_memory_dis = os.path.join(user_workspace, "memory_dis")
 
@@ -228,36 +351,43 @@ class AgentWorkspaceL2Processor(BaseProcessor):
                     shutil.rmtree(dst_memory_dis)
                 shutil.copytree(src_memory_dis, dst_memory_dis)
                 logger.info(
-                    "Initialized user memory_dis: %s -> %s",
-                    src_memory_dis,
-                    dst_memory_dis,
+                    f"Initialized user memory_dis: {src_memory_dis} -> {dst_memory_dis}"
                 )
             else:
                 logger.warning(
-                    "Global memory_dis not found, skip copy: %s", src_memory_dis
+                    f"Global memory_dis not found, skip copy: {src_memory_dis}"
                 )
-        except Exception as e:  # pragma: no cover - logging only
-            logger.warning("Failed to init user memory_dis: %s", e)
+        except Exception as e:
+            # memory_dis 初始化失败不阻断流程，只打 warning
+            logger.warning(f"Failed to init user memory_dis: {e}")
 
+        # 3. 结果文件和日志路径
         result_path = os.path.join(user_workspace, data.result_filename)
-        log_detail_path = os.path.join(self.cwd, data.logDetailPath)
-        log_summary_path = os.path.join(self.cwd, data.logSummaryPath)
-        log_run_path = os.path.join(self.cwd, data.logRunPath)
+        log_detail_path = data.logDetailPath
+        log_summary_path = data.logSummaryPath
+        log_run_path = data.logRunPath
 
+        # 确保日志目录存在
+        for log_path in (log_detail_path, log_summary_path, log_run_path):
+            log_dir = os.path.dirname(log_path)
+            if log_dir:
+                os.makedirs(log_dir, exist_ok=True)
+ 
         env = os.environ.copy()
-        if data.mcp_endpoint:
-            env["MCP_ENDPOINT"] = data.mcp_endpoint
-        if data.mcp_connection_id:
-            env["MCP_CONNECTION_ID"] = data.mcp_connection_id
+        # 确保交互式CLI有正确的终端环境
+        env["PYTHONUNBUFFERED"] = "1"
+        env["FORCE_COLOR"] = "1"  # 强制启用颜色输出
 
         async with run_kode_workflow(
-            user_workspace=user_workspace,
+            user_workspace=dst_memory_dis,
             workflow_name=data.workflow_name,
-            result_path=result_path,
+            log_run_path=log_run_path,
             env=env,
+            mcp_endpoint=data.mcp_endpoint,
+            mcp_connection_id=data.mcp_connection_id,
         ):
-            pass
-
+                pass
+        # 8. 返回给 SandboxTaskAbstract.save_task_write 使用
         return result_path, log_detail_path, log_summary_path, log_run_path
 
     def __call__(self, data: AgentWorkspaceL2ProcessorData):
@@ -288,25 +418,31 @@ class AgentWorkspaceL3Processor(BaseProcessor):
         return "AgentWorkspaceL3" in data.type
 
     async def _call_kode(self, data: AgentWorkspaceL3ProcessorData):
+        # Handle paths similar to _call_sandbox_start method
+        data.logDetailPath = (Path(self.cwd) / data.logDetailPath).as_posix()
+        data.logSummaryPath = (Path(self.cwd) / data.logSummaryPath).as_posix()
+        data.logRunPath = (Path(self.cwd) / data.logRunPath).as_posix()
+
         user_workspace = os.path.join(self.cwd, data.workspace_dir, data.user_id)
         os.makedirs(user_workspace, exist_ok=True)
 
         result_path = os.path.join(user_workspace, data.result_filename)
-        log_detail_path = os.path.join(self.cwd, data.logDetailPath)
-        log_summary_path = os.path.join(self.cwd, data.logSummaryPath)
-        log_run_path = os.path.join(self.cwd, data.logRunPath)
+        log_detail_path = data.logDetailPath
+        log_summary_path = data.logSummaryPath
+        log_run_path = data.logRunPath
 
         env = os.environ.copy()
-        if data.mcp_endpoint:
-            env["MCP_ENDPOINT"] = data.mcp_endpoint
-        if data.mcp_connection_id:
-            env["MCP_CONNECTION_ID"] = data.mcp_connection_id
+        # 确保交互式CLI有正确的终端环境
+        env["PYTHONUNBUFFERED"] = "1"
+        env["FORCE_COLOR"] = "1"  # 强制启用颜色输出
 
         async with run_kode_workflow(
             user_workspace=user_workspace,
             workflow_name=data.workflow_name,
-            result_path=result_path,
+            log_run_path=log_run_path,
             env=env,
+            mcp_endpoint=data.mcp_endpoint,
+            mcp_connection_id=data.mcp_connection_id,
         ):
             pass
 
