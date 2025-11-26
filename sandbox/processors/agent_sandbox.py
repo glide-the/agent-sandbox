@@ -159,154 +159,52 @@ async def run_kode_workflow(
             logger.error(f"MCP setup failed: {e}")
             raise RuntimeError(f"kode mcp add-sse command failed: {e}")
 
-    cmd = ["kode",  workflow_name]
+    cmd = ["/usr/local/bin/kode",  workflow_name,  "--debug", "--verbose", "--print"]
     logger.info(f"Running kode workflow: {' '.join(cmd)} in {user_workspace}")
-
-    # Setup file logging if log_run_path is provided
-    file_handler = None
-    if log_run_path:
-        # Ensure log directory exists
-        log_dir = os.path.dirname(log_run_path)
-        if log_dir:
-            os.makedirs(log_dir, exist_ok=True)
-
-        # Create file handler for dynamic logging
-        file_handler = logging.FileHandler(log_run_path, mode='a', encoding='utf-8')
-        file_handler.setLevel(logging.INFO)
-
-        # Create formatter for file logs
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        file_handler.setFormatter(formatter)
-
-        # Add file handler to logger
-        logger.addHandler(file_handler)
-
-        # Write initial log entry
-        logger.info(f"Starting kode workflow logging to: {log_run_path}")
+    env["CI"] = "1"  # 让那句 !process.env.CI 变成 False
 
     async with await anyio.open_process(
         cmd,
         cwd=user_workspace,
+        stdin=PIPE,
         stdout=PIPE,
         stderr=PIPE,
         env=env,
     ) as process:
-        last_output_time = time.time()
-        silence_timeout = 300
 
-        async def stream_reader(stream, label: str):
+        last_output_time = time.time()
+        silence_timeout = 300  # N秒无输出就杀掉进程，可调整
+
+        async def stream_reader(stream, label):
             nonlocal last_output_time
             try:
-                async for line in TextReceiveStream(
-                    stream, encoding="utf-8", errors="replace"
-                ):
-                    last_output_time = anyio.current_time()
-                    log_msg = f"[{user_workspace}] [{label}] {line.strip()}"
-                    logger.info(log_msg)
-                    # Also write to file if available
-                    if file_handler:
-                        file_handler.emit(
-                            logging.LogRecord(
-                                name="agent_sandbox",
-                                level=logging.INFO,
-                                pathname="",
-                                lineno=0,
-                                msg=log_msg,
-                                args=(),
-                                exc_info=None
-                            )
-                        )
-            except Exception as e:  # pragma: no cover - logging only
-                warning_msg = f"[{user_workspace}] [{label}] reader failed: {e}"
-                logger.warning(warning_msg)
-                # Also write to file if available
-                if file_handler:
-                    file_handler.emit(
-                        logging.LogRecord(
-                            name="agent_sandbox",
-                            level=logging.WARNING,
-                            pathname="",
-                            lineno=0,
-                            msg=warning_msg,
-                            args=(),
-                            exc_info=None
-                        )
-                    )
+                async for line in TextReceiveStream(stream, encoding="utf-8", errors="replace"):
+                    last_output_time = time.time()
+                    logger.info(f"[{user_workspace}] [{label}] {line.strip()}")
+            except Exception as e:
+                logger.warning(f"[{user_workspace}] [{label}] reader failed: {e}")
 
         async def watchdog():
             while True:
                 await anyio.sleep(1)
                 if process.returncode is not None:
+                    # 子进程已经结束，退出 watchdog
                     break
-                if anyio.current_time() - last_output_time > silence_timeout:
-                    warning_msg = (
-                        f"No log output for {silence_timeout} seconds, terminating process."
-                    )
-                    logger.warning(warning_msg)
-                    # Also write to file if available
-                    if file_handler:
-                        file_handler.emit(
-                            logging.LogRecord(
-                                name="agent_sandbox",
-                                level=logging.WARNING,
-                                pathname="",
-                                lineno=0,
-                                msg=warning_msg,
-                                args=(),
-                                exc_info=None
-                            )
-                        )
+                if time.time() - last_output_time > silence_timeout:
+                    logger.warning(f"No log output for {silence_timeout} seconds, terminating process.")
                     process.terminate()
                     break
 
-        try:
-            async with anyio.create_task_group() as tg:
-                tg.start_soon(stream_reader, process.stdout, "STDOUT")
-                tg.start_soon(stream_reader, process.stderr, "STDERR")
-                tg.start_soon(watchdog)
-                yield
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(stream_reader, process.stdout, "STDOUT")
+            tg.start_soon(stream_reader, process.stderr, "STDERR")
+            tg.start_soon(watchdog)
+            yield  # 控制权交给调用方（如 _call_sandbox_start）
 
-            await process.wait()
-            exit_msg = f"Kode workflow exited with code {process.returncode}"
-            logger.info(exit_msg)
-            # Also write to file if available
-            if file_handler:
-                file_handler.emit(
-                    logging.LogRecord(
-                        name="agent_sandbox",
-                        level=logging.INFO,
-                        pathname="",
-                        lineno=0,
-                        msg=exit_msg,
-                        args=(),
-                        exc_info=None
-                    )
-                )
-
-            if process.returncode != 0:
-                error_msg = "Kode workflow failed or was terminated due to silence."
-                # Also write to file if available
-                if file_handler:
-                    file_handler.emit(
-                        logging.LogRecord(
-                            name="agent_sandbox",
-                            level=logging.ERROR,
-                            pathname="",
-                            lineno=0,
-                            msg=error_msg,
-                            args=(),
-                            exc_info=None
-                        )
-                    )
-                raise RuntimeError(error_msg)
-        finally:
-            # Clean up file handler
-            if file_handler:
-                file_handler.flush()
-                file_handler.close()
-                logger.removeHandler(file_handler)
+        await process.wait()
+        logger.info(f"Evaluate process exited with code {process.returncode}")
+        if process.returncode != 0:
+            raise RuntimeError("Evaluate script failed or was terminated due to silence.")
 
 
 @registry.register_processor("agent_workspace_l2_processor")
@@ -436,15 +334,14 @@ class AgentWorkspaceL3Processor(BaseProcessor):
         env["PYTHONUNBUFFERED"] = "1"
         env["FORCE_COLOR"] = "1"  # 强制启用颜色输出
 
-        async with run_kode_workflow(
+        await run_kode_workflow(
             user_workspace=user_workspace,
             workflow_name=data.workflow_name,
             log_run_path=log_run_path,
             env=env,
             mcp_endpoint=data.mcp_endpoint,
             mcp_connection_id=data.mcp_connection_id,
-        ):
-            pass
+        )
 
         return result_path, log_detail_path, log_summary_path, log_run_path
 

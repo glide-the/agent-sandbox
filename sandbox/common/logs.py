@@ -21,7 +21,7 @@ def get_log_file(log_path: str, sub_dir: str):
     log_dir = os.path.join(log_path, sub_dir)
     # Here should be creating a new directory each time, so `exist_ok=False`
     os.makedirs(log_dir, exist_ok=False)
-    return os.path.join(log_dir, "zhipuai.log")
+    return os.path.join(log_dir, "agent-sandbox.log")
 
 
 def get_config_dict(
