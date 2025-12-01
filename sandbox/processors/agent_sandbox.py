@@ -3,13 +3,10 @@ import logging
 import os
 import shutil
 import asyncio
-import time   # 新增：用于时间戳和耗时
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import anyio
-from anyio.streams.text import TextReceiveStream
 import nest_asyncio
 from pydantic import Field
 
@@ -144,67 +141,24 @@ async def run_kode_workflow(
     """
     Launch a kode workflow within the given user workspace.
     """
-
-    from subprocess import PIPE
+    from sandbox.common.utils import run_kode_workflow_async, run_mcp_setup_async
 
     # Execute kode mcp add-sse command if mcp_endpoint and mcp_connection_id are provided
     if mcp_endpoint and mcp_connection_id:
-        import subprocess
-        mcp_cmd = ["kode", "mcp", "add-sse", mcp_connection_id, mcp_endpoint]
-        logger.info(f"Running MCP setup: {' '.join(mcp_cmd)} in {user_workspace}")
-        try:
-            subprocess.run(mcp_cmd, cwd=user_workspace, check=True, capture_output=True, text=True)
-            logger.info(f"MCP setup completed for connection {mcp_connection_id}")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"MCP setup failed: {e}")
-            raise RuntimeError(f"kode mcp add-sse command failed: {e}")
+        await run_mcp_setup_async(
+            mcp_endpoint=mcp_endpoint,
+            mcp_connection_id=mcp_connection_id,
+            workspace=user_workspace,
+            workspace_name=workflow_name
+        )
 
-    cmd = ["/usr/local/bin/kode",  workflow_name,  "--debug", "--verbose", "--print"]
-    logger.info(f"Running kode workflow: {' '.join(cmd)} in {user_workspace}")
-    env["CI"] = "1"  # 让那句 !process.env.CI 变成 False
-
-    async with await anyio.open_process(
-        cmd,
-        cwd=user_workspace,
-        stdin=PIPE,
-        stdout=PIPE,
-        stderr=PIPE,
+    # Use the new async workflow utility
+    async with run_kode_workflow_async(
+        user_workspace=user_workspace,
+        workflow_name=workflow_name,
         env=env,
-    ) as process:
-
-        last_output_time = time.time()
-        silence_timeout = 300  # N秒无输出就杀掉进程，可调整
-
-        async def stream_reader(stream, label):
-            nonlocal last_output_time
-            try:
-                async for line in TextReceiveStream(stream, encoding="utf-8", errors="replace"):
-                    last_output_time = time.time()
-                    logger.info(f"[{user_workspace}] [{label}] {line.strip()}")
-            except Exception as e:
-                logger.warning(f"[{user_workspace}] [{label}] reader failed: {e}")
-
-        async def watchdog():
-            while True:
-                await anyio.sleep(1)
-                if process.returncode is not None:
-                    # 子进程已经结束，退出 watchdog
-                    break
-                if time.time() - last_output_time > silence_timeout:
-                    logger.warning(f"No log output for {silence_timeout} seconds, terminating process.")
-                    process.terminate()
-                    break
-
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(stream_reader, process.stdout, "STDOUT")
-            tg.start_soon(stream_reader, process.stderr, "STDERR")
-            tg.start_soon(watchdog)
-            yield  # 控制权交给调用方（如 _call_sandbox_start）
-
-        await process.wait()
-        logger.info(f"Evaluate process exited with code {process.returncode}")
-        if process.returncode != 0:
-            raise RuntimeError("Evaluate script failed or was terminated due to silence.")
+    ):
+        yield  # 控制权交给调用方（如 _call_sandbox_start）
 
 
 @registry.register_processor("agent_workspace_l2_processor")
