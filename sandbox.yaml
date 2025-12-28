@@ -28,7 +28,7 @@ tasks:
       preprocess:
         - research_agent_processor:
             processor: "research_agent_processor"
-            processor_name: "Sandbox"
+            processor_name: "ResearchAgentSandbox"
 
 
 bootstrap:

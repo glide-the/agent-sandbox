@@ -45,7 +45,7 @@ class SandboxTranscriptWriter(TranscriptWriter):
 
     def write_to_file(self, text: str, end: str = "", flush: bool = True):
         self._buffer.append(text + end)
-        super().write_to_file(text, end=end, flush=flush)
+        super().write_to_file(text, flush=flush)
 
 
 @registry.register_processor("research_agent_processor")
