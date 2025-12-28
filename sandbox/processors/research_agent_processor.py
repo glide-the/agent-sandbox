@@ -240,6 +240,7 @@ class ResearchAgentProcessor(BaseProcessor):
             if ResearchAgentProcessor._options is None:
                 options = ClaudeAgentOptions(
                     permission_mode="bypassPermissions",
+                    cwd=workspace.as_posix(),
                     setting_sources=["project"],
                     system_prompt=lead_agent_prompt,
                     allowed_tools=["Task", "mcp__data-analyst-mcp__vanna_chat_once"],
