@@ -10,7 +10,11 @@ import nest_asyncio
 from dotenv import load_dotenv
 
 from sandbox.common.registry import registry
-from sandbox.processors import BaseProcessor, ProcessorData, SandboxProcessorData
+from sandbox.processors import (
+    BaseProcessor,
+    ProcessorData,
+    ResearchAgentSandboxProcessorData,
+)
 
 from sandbox.common.research_agent.utils.subagent_tracker import SubagentTracker
 from sandbox.common.research_agent.utils.transcript import TranscriptWriter
@@ -86,9 +90,9 @@ class ResearchAgentProcessor(BaseProcessor):
         return cls(cwd=cwd, prompts=prompts)
 
     def match(self, data: ProcessorData):
-        return getattr(data, "type", "") == "Sandbox"
+        return getattr(data, "type", "") == "ResearchAgentSandbox"
 
-    def __call__(self, code_input: SandboxProcessorData, topic: str):
+    def __call__(self, code_input: ResearchAgentSandboxProcessorData, topic: str):
         loop = asyncio.get_event_loop()
         result_path, log_detail_path, log_summary_path, log_run_path = loop.run_until_complete(
             self._run_research(code_input=code_input, topic=topic)
@@ -116,30 +120,28 @@ class ResearchAgentProcessor(BaseProcessor):
 
         return load_prompt(default_filename)
 
-    def _init_workspace(self, code_input: SandboxProcessorData) -> None:
+    def _init_workspace(self, code_input: ResearchAgentSandboxProcessorData) -> Path:
         cwd = Path(self.cwd)
 
-        code_input.evaluatorDir = (cwd / code_input.evaluatorDir).as_posix()
-        code_input.evaluatorPath = (Path(code_input.evaluatorDir) / code_input.evaluatorPath).as_posix()
-        code_input.standardFileDir = (cwd / code_input.standardFileDir).as_posix()
-        code_input.standardFilePath = (Path(code_input.standardFileDir) / code_input.standardFilePath).as_posix()
-        code_input.userFileDir = (cwd / code_input.userFileDir).as_posix()
-        code_input.userFilePath = (Path(code_input.userFileDir) / code_input.userFilePath).as_posix()
-        code_input.userImagesDir = (Path(code_input.userFileDir) / code_input.userImagesDir).as_posix()
+        if code_input.workspace:
+            workspace = Path(code_input.workspace)
+            if not workspace.is_absolute():
+                workspace = cwd / workspace
+        else:
+            workspace = cwd / "workspace" / code_input.userId
 
-        code_input.logDetailPath = (Path(code_input.evaluatorDir) / code_input.logDetailPath).as_posix()
-        code_input.logSummaryPath = (Path(code_input.evaluatorDir) / code_input.logSummaryPath).as_posix()
-        code_input.logRunPath = (Path(code_input.evaluatorDir) / code_input.logRunPath).as_posix()
+        workspace.mkdir(parents=True, exist_ok=True)
 
-        Path(code_input.evaluatorDir).mkdir(parents=True, exist_ok=True)
-        Path(code_input.standardFileDir).mkdir(parents=True, exist_ok=True)
-        Path(code_input.userFileDir).mkdir(parents=True, exist_ok=True)
-        Path(code_input.userImagesDir).mkdir(parents=True, exist_ok=True)
-        Path(code_input.logDetailPath).parent.mkdir(parents=True, exist_ok=True)
-        Path(code_input.logSummaryPath).parent.mkdir(parents=True, exist_ok=True)
-        Path(code_input.logRunPath).parent.mkdir(parents=True, exist_ok=True)
+        user_files_dir = workspace / code_input.userFilesDir
+        user_files_dir.mkdir(parents=True, exist_ok=True)
 
-        workspace = Path(code_input.evaluatorDir)
+        user_logs_dir = workspace / code_input.userLogsDir
+        user_logs_dir.mkdir(parents=True, exist_ok=True)
+
+        code_input.logDetailPath = (workspace / code_input.logDetailPath).as_posix()
+        code_input.logSummaryPath = (workspace / code_input.logSummaryPath).as_posix()
+        code_input.logRunPath = (workspace / code_input.logRunPath).as_posix()
+
         import sandbox.common.research_agent as research_agent
         project_root = Path(research_agent.__file__).resolve().parent
         claude_src = project_root / ".claude"
@@ -153,10 +155,11 @@ class ResearchAgentProcessor(BaseProcessor):
         if mcp_src.exists() and not mcp_dst.exists():
             shutil.copy(mcp_src, mcp_dst)
 
-    async def _run_research(self, code_input: SandboxProcessorData, topic: str):
-        self._init_workspace(code_input)
+        return workspace
 
-        workspace = Path(code_input.evaluatorDir)
+    async def _run_research(self, code_input: ResearchAgentSandboxProcessorData, topic: str):
+        workspace = self._init_workspace(code_input)
+
         original_cwd = Path.cwd()
         os.chdir(workspace)
 
@@ -275,7 +278,7 @@ class ResearchAgentProcessor(BaseProcessor):
             summary = {
                 "topic": topic,
                 "workspace": str(workspace),
-                "reports_dir": str(workspace / "files" / "reports"),
+                "reports_dir": str(workspace / code_input.userFilesDir / "reports"),
                 "logs": {
                     "detail": code_input.logDetailPath,
                     "summary": code_input.logSummaryPath,
@@ -286,13 +289,13 @@ class ResearchAgentProcessor(BaseProcessor):
             with log_summary_file.open("w", encoding="utf-8") as handle:
                 json.dump(summary, handle, ensure_ascii=False, indent=2)
 
-            result_path = code_input.evaluatorPath
+            result_path = (log_summary_file.parent / "result.json").as_posix()
             Path(result_path).parent.mkdir(parents=True, exist_ok=True)
 
             result_payload = {
                 "topic": topic,
                 "workspace": str(workspace),
-                "reports_dir": str(workspace / "files" / "reports"),
+                "reports_dir": str(workspace / code_input.userFilesDir / "reports"),
                 "logs": {
                     "detail": code_input.logDetailPath,
                     "summary": code_input.logSummaryPath,
