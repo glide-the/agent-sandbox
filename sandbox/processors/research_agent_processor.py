@@ -126,7 +126,7 @@ class ResearchAgentProcessor(BaseProcessor):
         if code_input.workspace:
             workspace = Path(code_input.workspace)
             if not workspace.is_absolute():
-                workspace = cwd / workspace
+                workspace = cwd / workspace / code_input.userId
         else:
             workspace = cwd / "workspace" / code_input.userId
 
