@@ -12,9 +12,9 @@ from dotenv import load_dotenv
 from sandbox.common.registry import registry
 from sandbox.processors import BaseProcessor, ProcessorData, SandboxProcessorData
 
-from common.research_agent.utils.subagent_tracker import SubagentTracker
-from common.research_agent.utils.transcript import TranscriptWriter
-from common.research_agent.utils.message_handler import process_assistant_message
+from sandbox.common.research_agent.utils.subagent_tracker import SubagentTracker
+from sandbox.common.research_agent.utils.transcript import TranscriptWriter
+from sandbox.common.research_agent.utils.message_handler import process_assistant_message
 from common.research_agent import load_prompt
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AgentDefinition, HookMatcher
 
@@ -140,7 +140,7 @@ class ResearchAgentProcessor(BaseProcessor):
         Path(code_input.logRunPath).parent.mkdir(parents=True, exist_ok=True)
 
         workspace = Path(code_input.evaluatorDir)
-        import common.research_agent as research_agent
+        import sandbox.common.research_agent as research_agent
         project_root = Path(research_agent.__file__).resolve().parent
         claude_src = project_root / ".claude"
         mcp_src = project_root / ".mcp.json"
