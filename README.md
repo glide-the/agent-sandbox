@@ -1,276 +1,274 @@
-# README
+# Agent Sandbox
 
-### 介绍
+一个基于 Python 的智能体沙箱执行环境，用于安全地运行和管理 AI Agent 任务，支持研究型 Agent 和通用代码评测。
 
-用户可通过自主编写evaluate.py文件，实现打分逻辑，并重新打包为zip，评测配置页面。当测试记录可成功出分时，此时该条测试记录的状态会显示”成功“字样，“发布”按钮也会变成可点击状态。点击“发布”该条测试记录状态会显示为“审核中”字样，待天池工作人员审核通过即可完成评测程序发布上线。
+## 项目简介
 
-### 编写一个评测的步骤
+Agent Sandbox 是一个灵活的沙箱执行框架，旨在为 AI Agent 提供安全的执行环境。该项目支持多种任务类型，包括研究型 Agent（Research Agent）和代码评测任务，通过 Web API 提供服务，并支持任务状态跟踪、日志记录和结果管理。
 
-注意评测系统的python版本为3.9.12，所以需要使用python 3的语法格式。
+## 主要特性
 
-1.  下载 评测程序.zip；
-    
-2.  解压评测程序.zip 得到eval.zip，等一些评测文件；
-    
-3.  修改evaluate.py，完善评测逻辑，以及错误时的错误描述逻辑；
-    
-4.  在eval文件夹下放入标准答案和测试提交文件，例如answer.txt、submit.txt(具体文件后缀名视赛题需要可自行设定)
-    
-5.  填写input\_param.json标准答案和测试提交文件，例如：
-    
+- **多任务支持**: 支持研究型 Agent、代码评测等多种任务类型
+- **异步执行**: 基于 asyncio 的异步任务执行框架
+- **Web API**: 基于 FastAPI 的 RESTful API 接口
+- **任务追踪**: 实时任务状态监控和进度报告
+- **日志管理**: 完善的日志记录系统，支持分级别日志输出
+- **配置灵活**: 通过 YAML 配置文件管理任务和处理器
+- **沙箱隔离**: 为每个任务提供独立的执行环境
+
+## 项目结构
+
 ```
+agent-sandbox/
+├── sandbox/                  # 核心代码模块
+│   ├── common/              # 通用工具类
+│   │   ├── general.py       # 通用功能
+│   │   ├── registry.py      # 注册表系统
+│   │   ├── logs.py          # 日志配置
+│   │   └── utils.py         # 工具函数
+│   ├── load/                # 序列化相关
+│   ├── server/              # Web 服务器
+│   │   ├── bootstrap/       # 启动引导
+│   │   ├── model/           # 数据模型
+│   │   └── servlet/         # API 端点
+│   ├── start/               # 启动入口
+│   │   ├── core.py          # 核心逻辑
+│   │   └── main.py          # 主入口
+│   └── tasks/               # 任务定义
+│       ├── base_task.py     # 基础任务类
+│       ├── sanbox_eval_task.py    # 评测任务
+│       └── research_agent_task.py # 研究型 Agent 任务
+├── app/                     # 应用运行目录
+│   └── sandbox/             # 沙箱工作空间
+├── scripts/                 # 脚本工具
+├── docs/                    # 文档
+├── sandbox.yaml             # 配置文件
+├── pyproject.toml           # 项目配置
+└── README.md                # 项目说明
+```
+
+## 环境要求
+
+- Python >= 3.10, < 3.12
+- Poetry (用于依赖管理)
+
+## 安装
+
+### 1. 克隆项目
+
+```bash
+git clone <repository-url>
+cd agent-sandbox
+```
+
+### 2. 安装依赖
+
+使用 Poetry 安装依赖：
+
+```bash
+poetry install
+```
+
+或激活虚拟环境后手动安装：
+
+```bash
+poetry shell
+pip install -r requirements.txt
+```
+
+## 配置
+
+项目的主要配置文件为 [sandbox.yaml](sandbox.yaml)，包含以下配置项：
+
+### preprocess（预处理器）
+
+定义可用的任务处理器：
+
+```yaml
+preprocess:
+  - sandbox_started_processor:
+      name: "sandbox_started_processor"
+      cwd: "/path/to/sandbox"
+  - research_agent_processor:
+      name: "research_agent_processor"
+      cwd: "/path/to/sandbox"
+```
+
+### tasks（任务）
+
+注册任务及其对应的处理器：
+
+```yaml
+tasks:
+  - sandbox_eval_task:
+      name: "sandbox_eval_task"
+      preprocess:
+        - sandbox_started_processor:
+            processor: "sandbox_started_processor"
+            processor_name: "Sandbox"
+```
+
+### bootstrap（启动配置）
+
+Web 服务配置：
+
+```yaml
+bootstrap:
+  - runner_bootstrap_web:
+      name: "runner_bootstrap_web"
+      host: "0.0.0.0"
+      port: 10000
+      max_ongoing_tasks: 10
+      web_client_timeout: 1800
+      finished_task_remove_timeout: 100
+```
+
+## 使用方法
+
+### 启动模式
+
+项目支持三种运行模式：
+
+#### 1. Demo 模式
+
+用于快速测试和演示：
+
+```bash
+python -m sandbox.start.main -m demo
+```
+
+#### 2. Web 模式
+
+启动 Web API 服务器：
+
+```bash
+python -m sandbox.start.main -m web
+```
+
+#### 3. Web Runner 模式
+
+启动任务执行器：
+
+```bash
+python -m sandbox.start.main -m web_runner --nonce <your-nonce>
+```
+
+### 命令行参数
+
+- `-m, --mode`: 运行模式（demo/web/web_runner）
+- `-v, --verbose`: 输出调试信息
+- `--speakers-config-file`: 配置文件路径（默认: sandbox.yaml）
+- `--nonce`: 用于 Web 服务器间通信的安全令牌
+
+## API 接口
+
+### 提交任务
+
+向 `/submit` 端点 POST 数据来提交新任务。
+
+```json
 {
-  "fileData":{
-    "evaluatorDir":"",
-    "evaluatorPath":"",
-    "standardFileDir":"",
-    "standardFilePath":"answer.txt",
-    "userFileDir":"",
-    "userFilePath":"submit.txt"
+  "code_input": {
+    "userId": "user_123",
+    "type": "Sandbox",
+    "workspace": "/path/to/workspace",
+    "config": {}
   }
 }
 ```
-    
-1.  如有特殊的包需要额外安装，请在评测配置页面requirements输入框中进行填写，每个包名称后需进行换行。
-    
-2.  本地测试评测程序，运行结束查看eval\_result.json结果是否正常：
 
+### 查询任务状态
 
-```
-python3 evaluate.py input_param.json eval_result.json
-```
+通过任务 ID 查询执行状态和结果。
 
-1.  重新打包为压缩包，必须包含修改后的evaluate.py打分逻辑文件和启动文件py\_entrance.sh(无须修改demo中的py\_entrance.sh)，文件树状结构如下所示：
-    
-```text
+### 任务执行流程
 
-——eval.zip
+1. 接收任务请求
+2. 创建 Runner 实例
+3. 调用相应的 Processor 处理任务
+4. 实时报告进度
+5. 保存执行结果和日志
+6. 返回最终结果
 
-——evaluate.py
+## 任务类型
 
-——py\_entrance.sh
+### SandboxEvalTask
 
-——...（其他包含中间过程函数的python文件）
+通用沙箱评测任务，支持代码执行和结果评测。
 
-```
-2.  将评测程序、参考输入和标准答案在天池大赛系统的评测配置页面进行提交即可完成一次测试。如果测试记录状态为“成功”可点击“发布”按钮提交审核；如果测试失败，请根据测试记录提供的错误信息和详情对打分逻辑代码进行修改。
-    
+### ResearchAgentTask
 
-### 打分代码介绍
+研究型 Agent 任务，支持：
+- 多步骤研究流程
+- 数据分析和报告生成
+- SQL 查询执行
+- 向量检索（集成 Milvus）
 
-#### 1.输入和输出参数
+## 开发指南
 
-当选手提交了结果文件或者选手代码预测生成了结果文件后，天池平台的打分服务，会这样触发调用：
+### 添加新的 Processor
 
-```shell
-sh py_entrance.sh input_param.json eval_result.json
-```
+1. 在 `sandbox/processors/` 下创建新的处理器类
+2. 继承 `BaseProcessor`
+3. 实现 `match()` 和 `__call__()` 方法
+4. 在 [sandbox.yaml](sandbox.yaml) 中注册
 
-其中第一个参数input\_param.json文件，用于在打分逻辑代码中读取评测标准答案和选手提交文件，内容示例如下（**该文件请勿自行增加字段**）：
-```text
+### 添加新的 Task
 
-    {
-      "fileData":{
-        "evaluatorDir":"",
-        "evaluatorPath":"",
-        "standardFileDir":"",
-        "standardFilePath":"评测答案文件路径，比如answer.zip/the path of ground truth",
-        "userFileDir":"",
-        "userFilePath":"需要被评测的文件路径，比如submit.zip/ the path of submission"
-      }
-    }
+1. 在 `sandbox/tasks/` 下创建新的任务类
+2. 继承 `SandboxTaskAbstract`
+3. 实现 `prepare()`, `dispatch()`, `complete()` 方法
+4. 在注册表中注册任务
 
-```
-第二个参数eval\_result.json，表示评测程序应该把结果写入这个文件。
+## 依赖说明
 
-**注意：**
+主要依赖包括：
 
-*   以上两个文件仅在本地自测时使用，正式对选手提交文件进行评测时，内容均会动态生成
-    
-*   打分逻辑程序（evaluate.py）不需要关注具体的名称，直接取值即可：
-```python
+- **FastAPI & Uvicorn**: Web 框架
+- **Pydantic**: 数据验证
+- **OpenAI**: LLM 接口
+- **Claude Agent SDK**: Anthropic Agent 集成
+- **PyMilvus**: 向量数据库
+- **Elasticsearch**: 全文检索
+- **Pandas & NumPy**: 数据处理
+- **Jieba & NLTK**: 自然语言处理
+- **Text2Vec**: 文本向量化
 
-input_file  = open(sys.argv[1])
-input_param = json.load(input_file)
+## 日志
 
-# 答案文件路径 the path of ground truth
-standard_file = input_param['fileData']['standardFilePath']
-# 用户提交文件路径 the path of submission
-user_file     = input_param['fileData']['userFilePath']
-```
-    
-*   针对结果文件：
-    
-```text
+日志文件存储在 `logs/` 目录下，按运行模式和时间戳组织：
 
-output_file = open(sys.argv[2], 'w')
-```
+- `web_<timestamp>/`: Web 服务日志
+- `web_runner_<timestamp>/`: Runner 日志
 
-#### 2.输出结果的规范
+## 常见问题
 
-*   评测成功的输出：
-```text
+### 1. 端口被占用
 
-    {
-      "score": 1.0,  # 这个score是必须的，请勿删除并改为其他名称
-      "scoreJson": {
-        "score": 1.0  # 这里的key一般也是score，注意保留这个key；但可以增加其他key，如下示例
-      	"score1": 1.5 # 只是示例
-      	"score2": 2.0 # 只是示例，注意这里的value不能是[]之类的，必须只是一个分数
-      },
-      "success": true
-    }
-```
-    
-*   评测错误的输出：
+修改 [sandbox.yaml](sandbox.yaml) 中的 `port` 配置。
 
-```text
+### 2. 任务超时
 
+调整 `web_client_timeout` 参数。
 
-    {
-      "errorDetail": "user input is wrong, please check !",
-      "errorMsg": "user input is wrong, please check !", # 这个会透出给用户
-      "score": 0,
-      "scoreJson": { # 注意出错时，scoreJson请保持为{}
-      },
-      "success": false
-    }
+### 3. 工作目录权限
 
-```
-#### 3.打分程序注意事项
+确保沙箱工作目录有正确的读写权限。
 
-*   需要解压答案和选手文件的情况
-    
+## 许可证
 
-目前打分程序在容器运行的逻辑是，下载评测代码、标准答案、选手答案，为root用户运行；**解压到当前目录下（标准答案：**./standard/**）（提交文件：./submit/）；****同时针对选手答案的解压，如果发现该目录已经存在，一定要先删除并再解压！**示例代码如下：
-```python
+MIT License
 
-import zipfile
-import os
-import logging
-import shutil
+## 作者
 
-......
+glide the <dmeck@suoxya.com>
 
-# standard_file 代表标准答案的路径
-if os.path.isdir('./standard') and len(os.listdir('./standard')) > 0:
-    logging.info("no need to unzip %s", standard_file)
-else:
-    with zipfile.ZipFile(standard_file, "r") as zip_ref:
-        zip_ref.extractall("./standard")
-        zip_ref.close()
+## 贡献
 
-# submit_file 表示选手提交的文件路径
-submit_file_dir = os.path.join("./submit/")
-if os.path.isdir(submit_file_dir):
-    shutil.rmtree(submit_file_dir)
-with zipfile.ZipFile(submit_file, "r") as zip_data:
-    zip_data.extractall(submit_file_dir)
-    zip_data.close()
-```
+欢迎提交 Issue 和 Pull Request！
 
-*   请注意需要多次测试评测程序，以保证能涵盖选手提交情况进而给出选手适当的错误信息。测试情况包括但不限于：提交格式不符合要求；提交条数有缺失；重复数据提交数据有0，Null，空格；评测指标存在分母为0的情况；使用log时注意检查负数；提交全错数据；提交全对数据；提交正常答案。
-    
+## 相关资源
 
-
-
-### 评测运行环境已安装的python包列表
-```text
-
-Package              Version     Editable project location
--------------------- ----------- ----------------------------
-aiohappyeyeballs     2.6.1
-aiohttp              3.11.16
-aiosignal            1.3.2
-annotated-types      0.7.0
-anyio                4.9.0
-argon2-cffi          23.1.0
-argon2-cffi-bindings 21.2.0
-asn1crypto           1.5.1
-async-timeout        5.0.1
-attrs                25.3.0
-azure-core           1.33.0
-azure-storage-blob   12.25.1
-certifi              2023.11.17
-cffi                 1.17.1
-charset-normalizer   3.4.1
-click                8.1.8
-colorama             0.4.6
-cryptography         44.0.2
-datasets             2.19.1
-dill                 0.3.8
-elasticsearch        7.11.0
-environs             9.5.0
-et_xmlfile           2.0.0
-exceptiongroup       1.2.2
-fastapi              0.109.2
-filelock             3.18.0
-frozenlist           1.5.0
-fsspec               2024.3.1
-grpcio               1.60.0
-h11                  0.14.0
-huggingface-hub      0.30.2
-idna                 3.10
-isodate              0.7.2
-jieba                0.42.1
-jiojio               1.2.7
-jionlp               1.5.20
-joblib               1.4.2
-jsonlines            4.0.0
-loguru               0.7.3
-marshmallow          3.26.1
-minio                7.2.15
-modelscope           1.25.0
-multidict            6.4.3
-multiprocess         0.70.16
-nest-asyncio         1.5.6
-nltk                 3.8.1
-numpy                1.24.4
-omegaconf            2.0.6
-openpyxl             3.1.5
-oscrypto             1.3.0
-packaging            24.2
-pandas               2.0.3
-pillow               11.1.0
-pip                  25.0
-propcache            0.3.1
-protobuf             6.30.2
-pyarrow              19.0.1
-pyarrow-hotfix       0.6
-pycparser            2.22
-pycryptodome         3.22.0
-pydantic             2.5.3
-pydantic_core        2.14.6
-pymilvus             2.3.8
-python-dateutil      2.9.0.post0
-python-dotenv        1.1.0
-python-multipart     0.0.20
-pytz                 2025.2
-PyYAML               6.0.2
-regex                2024.11.6
-requests             2.31.0
-safetensors          0.5.3
-scikit-learn         1.6.1
-scipy                1.15.2
-setuptools           78.1.0
-simplejson           3.19.3
-six                  1.17.0
-sniffio              1.3.1
-starlette            0.36.3
-text2vec             1.2.9
-threadpoolctl        3.6.0
-tokenizers           0.21.1
-tqdm                 4.66.6
-transformers         4.51.3
-typing_extensions    4.13.2
-tzdata               2025.2
-ujson                5.10.0
-urllib3              1.26.20
-uvicorn              0.34.1
-wheel                0.45.1
-win32_setctime       1.2.0
-xxhash               3.5.0
-yarl                 1.19.0 
-zipfile36            0.1.3
-
-```
+- [Claude Agent SDK 文档](https://docs.anthropic.com/)
+- [FastAPI 文档](https://fastapi.tiangolo.com/)
+- [Poetry 文档](https://python-poetry.org/docs/)
