@@ -92,6 +92,29 @@ class ResearchAgentProcessor(BaseProcessor):
     def match(self, data: ProcessorData):
         return getattr(data, "type", "") == "ResearchAgentSandbox"
 
+    def init_paths(self, code_input: ResearchAgentSandboxProcessorData, task_id: str) -> dict:
+        """
+        利用现有 _init_workspace 逻辑，基于 code_input 初始化：
+        - workspace 目录
+        - 日志目录（logDetailPath / logSummaryPath / logRunPath）
+        - result.json 路径
+        """
+        workspace = self._init_workspace(code_input)
+
+        log_detail_file = Path(code_input.logDetailPath)
+        log_summary_file = Path(code_input.logSummaryPath)
+        log_run_file = Path(code_input.logRunPath)
+
+        result_path = (log_summary_file.parent / "result.json").as_posix()
+        Path(result_path).parent.mkdir(parents=True, exist_ok=True)
+
+        return {
+            "result_path": result_path,
+            "log_detail_path": log_detail_file.as_posix(),
+            "log_summary_path": log_summary_file.as_posix(),
+            "log_run_path": log_run_file.as_posix(),
+        }
+
     def __call__(self, code_input: ResearchAgentSandboxProcessorData, topic: str):
         loop = asyncio.get_event_loop()
         result_path, log_detail_path, log_summary_path, log_run_path = loop.run_until_complete(

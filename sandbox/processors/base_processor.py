@@ -49,6 +49,22 @@ class BaseProcessor:
         """
         raise NotImplementedError
 
+    def init_paths(self, code_input: ProcessorData, task_id: str) -> dict:
+        """
+        初始化任务相关的输出 / 日志路径，返回统一结构的路径字典：
+        {
+            'result_path': str,
+            'log_detail_path': str,
+            'log_summary_path': str,
+            'log_run_path': str,
+        }
+
+        默认实现抛异常，具体 Processor 里按各自逻辑实现。
+        :param code_input: 当前任务的输入数据（通常是 SandboxProcessorData / ResearchAgentSandboxProcessorData）
+        :param task_id: 当前任务 id，用于需要按任务维度隔离目录的场景
+        """
+        raise NotImplementedError("init_paths must be implemented in subclasses of BaseProcessor")
+
     @classmethod
     def from_config(cls, cfg=None):
         return cls()
@@ -57,4 +73,3 @@ class BaseProcessor:
         cfg = OmegaConf.create(kwargs)
 
         return self.from_config(cfg)
-

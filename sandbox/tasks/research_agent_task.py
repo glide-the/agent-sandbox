@@ -109,6 +109,7 @@ class ResearchAgentTask(SandboxTaskAbstract):
         """
         调度逻辑：
         - 找到对应 Processor（ResearchAgentProcessor）
+        - 调用 processor.init_paths(...) 初始化路径并上报
         - 调用 processor(sandbox_input, topic)
         - 把返回的路径交给 SandboxTaskAbstract.save_task_write
         """
@@ -118,7 +119,7 @@ class ResearchAgentTask(SandboxTaskAbstract):
             await self.report_progress(
                 task_id=runner.task_id,
                 runner_stat="research_agent_task",
-                state="dispatch_start",
+                state="dispatch_research_agent_task",
                 finished=False,
             )
 
@@ -135,6 +136,18 @@ class ResearchAgentTask(SandboxTaskAbstract):
 
             if hasattr(processor, "match") and not processor.match(sandbox_input):
                 raise RuntimeError("Unsupported processor for this Sandbox input")
+
+            init_paths_result = {}
+            if hasattr(processor, "init_paths"):
+                init_paths_result = processor.init_paths(sandbox_input, runner.task_id)
+
+                await self.report_progress(
+                    task_id=runner.task_id,
+                    runner_stat="research_agent_task",
+                    state="init_paths",
+                    finished=False,
+                    result=init_paths_result,
+                )
 
             result_path, log_detail_path, log_summary_path, log_run_path = processor(
                 sandbox_input, topic
