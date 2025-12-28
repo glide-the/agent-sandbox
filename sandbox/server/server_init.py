@@ -91,6 +91,15 @@ async def dispatch(speakers_config_file: str, nonce: str = None):
                     state = runner.task_states[task_id]
                     state['info'] = 'error'
                     state['finished'] = True
+                    payload = runner.task_data.get(task_id)
+                    if payload:
+                        user_id = runner.extract_user_id(payload)
+                        if user_id:
+                            runner.update_user_task_index(
+                                user_id=user_id,
+                                task_id=task_id,
+                                finished=True,
+                            )
                 client_process = start_translator_client_proc(speakers_config_file=speakers_config_file, nonce=nonce)
 
             # Filter queued and finished tasks
@@ -119,6 +128,15 @@ async def dispatch(speakers_config_file: str, nonce: str = None):
             for tid in to_del_task_ids:
                 logger.debug(f'Removing task {tid} from queue')
                 # Remove task from queue
+                payload = runner.task_data.get(tid)
+                if payload:
+                    user_id = runner.extract_user_id(payload)
+                    if user_id:
+                        runner.update_user_task_index(
+                            user_id=user_id,
+                            task_id=tid,
+                            finished=True,
+                        )
                 del runner.task_states[tid]
                 del runner.task_data[tid]
 

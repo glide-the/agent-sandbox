@@ -3,8 +3,10 @@ from typing import Dict
 
 from sandbox.common.registry import registry
 from sandbox.processors import BaseProcessor, ResearchAgentSandboxProcessorData, get_processors
+from sandbox.server.bootstrap.bootstrap_register import get_bootstrap
 from sandbox.server.model.flow_data import PayLoad
 from sandbox.tasks import FlowData, Runner, SandboxTaskAbstract
+from sandbox.tasks.exceptions import TaskRejectedError
 
 
 def _md5(input_string: str) -> str:
@@ -76,6 +78,20 @@ class ResearchAgentTask(SandboxTaskAbstract):
         params = payload.payload or {}
         code_input = params.get("code_input", {})
         topic = params.get("topic", "")
+
+        user_id = code_input.get("userId")
+        if user_id:
+            try:
+                runner_bootstrap_web = get_bootstrap("runner_bootstrap_web")
+            except ValueError:
+                runner_bootstrap_web = None
+
+            if runner_bootstrap_web and runner_bootstrap_web.user_has_running_task(user_id):
+                running_task_ids = runner_bootstrap_web.get_user_running_tasks(user_id)
+                running_task_text = ", ".join(sorted(running_task_ids))
+                raise TaskRejectedError(
+                    f"user {user_id} already has running tasks: {running_task_text}"
+                )
 
         sandbox_input = ResearchAgentSandboxProcessorData(**code_input)
         flow_data = ResearchAgentFlowData(sandbox_input=sandbox_input, topic=topic)
