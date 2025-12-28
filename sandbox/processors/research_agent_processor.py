@@ -15,7 +15,7 @@ from sandbox.processors import BaseProcessor, ProcessorData, SandboxProcessorDat
 from sandbox.common.research_agent.utils.subagent_tracker import SubagentTracker
 from sandbox.common.research_agent.utils.transcript import TranscriptWriter
 from sandbox.common.research_agent.utils.message_handler import process_assistant_message
-from common.research_agent import load_prompt
+from sandbox.common.research_agent import load_prompt
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AgentDefinition, HookMatcher
 
 logger = logging.getLogger(__name__)
