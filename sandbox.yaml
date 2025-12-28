@@ -7,6 +7,14 @@ preprocess:
     - sandbox_started_processor:
           name: "sandbox_started_processor"
           cwd: "/app/sandbox"
+    - research_agent_processor:
+          name: "research_agent_processor"
+          cwd: "/app/sandbox"
+          prompts:
+            lead_agent: "/app/research_agent/prompts/lead_agent_sql.txt"
+            researcher: "/app/research_agent/prompts/researcher_sql.txt"
+            data_analyst: "/app/research_agent/prompts/data_analyst_sql.txt"
+            report_writer: "/app/research_agent/prompts/report_writer.txt"
 
 tasks:
   - sandbox_eval_task:
@@ -14,6 +22,12 @@ tasks:
       preprocess:
         - sandbox_started_processor:
             processor: "sandbox_started_processor"
+            processor_name: "Sandbox"
+  - research_agent_task:
+      name: "research_agent_task"
+      preprocess:
+        - research_agent_processor:
+            processor: "research_agent_processor"
             processor_name: "Sandbox"
 
 
@@ -25,4 +39,3 @@ bootstrap:
       max_ongoing_tasks: 10
       web_client_timeout: 1800
       finished_task_remove_timeout: 100
-
