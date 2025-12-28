@@ -16,6 +16,7 @@ from sandbox.server.model.result import (
     TaskRunnerResponse,
     TaskVoiceFlowInfo,
 )
+from sandbox.tasks.exceptions import TaskRejectedError
 
 logger = logging.getLogger('server_runner')
 
@@ -48,7 +49,10 @@ async def submit_async(payload: PayLoad):
     now = time.time()
     payload.created_at = now
     payload.requested_at = now
-    runner = task.prepare(payload=payload)
+    try:
+        runner = task.prepare(payload=payload)
+    except TaskRejectedError as exc:
+        return TaskRunnerResponse(code=409, msg=str(exc), data={})
     task_id = runner.task_id
 
     task_state = {}
@@ -66,6 +70,9 @@ async def submit_async(payload: PayLoad):
         runner_bootstrap_web.queue.append(task_id)
 
         runner_bootstrap_web.task_states[task_id] = task_state
+        user_id = runner_bootstrap_web.extract_user_id(payload)
+        if user_id:
+            runner_bootstrap_web.update_user_task_index(user_id=user_id, task_id=task_id, finished=False)
     else:
         task_state = runner_bootstrap_web.task_states[task_id]
 
@@ -128,6 +135,13 @@ async def post_task_update_async(runner_state: RunnerState):
                     'info': runner_state.state,
                     'finished': runner_state.finished,
                 })
+            user_id = runner_bootstrap_web.extract_user_id(runner_bootstrap_web.task_data[task_id])
+            if user_id:
+                runner_bootstrap_web.update_user_task_index(
+                    user_id=user_id,
+                    task_id=task_id,
+                    finished=runner_state.finished,
+                )
             logger.info(f'Task state {task_id} to {runner_bootstrap_web.task_states[task_id]}')
 
     return BaseResponse(code=200, msg="成功")
