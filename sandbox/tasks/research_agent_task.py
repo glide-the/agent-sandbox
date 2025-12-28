@@ -2,7 +2,7 @@ import hashlib
 from typing import Dict
 
 from sandbox.common.registry import registry
-from sandbox.processors import BaseProcessor, SandboxProcessorData, get_processors
+from sandbox.processors import BaseProcessor, ResearchAgentSandboxProcessorData, get_processors
 from sandbox.server.model.flow_data import PayLoad
 from sandbox.tasks import FlowData, Runner, SandboxTaskAbstract
 
@@ -16,11 +16,11 @@ def _md5(input_string: str) -> str:
 class ResearchAgentFlowData(FlowData):
     """
     Runner.flow_data 的具体类型：
-    - sandbox_input: 文件/路径相关参数（兼容 SandboxProcessorData）
+    - sandbox_input: 文件/路径相关参数（ResearchAgentSandboxProcessorData）
     - topic: 研究主题
     """
 
-    sandbox_input: SandboxProcessorData
+    sandbox_input: ResearchAgentSandboxProcessorData
     topic: str
 
     @property
@@ -68,7 +68,7 @@ class ResearchAgentTask(SandboxTaskAbstract):
             "reset": true
           },
           "payload": {
-            "code_input": { ... SandboxProcessorData 所需字段 ... },
+            "code_input": { ... ResearchAgentSandboxProcessorData 所需字段 ... },
             "topic": "需要研究的主题"
           }
         }
@@ -77,7 +77,7 @@ class ResearchAgentTask(SandboxTaskAbstract):
         code_input = params.get("code_input", {})
         topic = params.get("topic", "")
 
-        sandbox_input = SandboxProcessorData(**code_input)
+        sandbox_input = ResearchAgentSandboxProcessorData(**code_input)
         flow_data = ResearchAgentFlowData(sandbox_input=sandbox_input, topic=topic)
 
         raw_id = f"{sandbox_input.userId}_{payload.created_at}_{_md5(str(sandbox_input) + topic)}"

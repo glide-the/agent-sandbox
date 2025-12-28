@@ -53,6 +53,44 @@ class SandboxProcessorData(ProcessorData):
         return "Sandbox"
 
 
+class ResearchAgentSandboxProcessorData(ProcessorData):
+    """
+    research_agent_task 专用的输入结构：
+    只关注 workspace 和用户相关的目录 / 日志文件，不再包含 evaluatorDir/standardFileDir 等评测字段。
+
+    典型 input_param.json 结构示例：
+
+    {
+      "fileData": {
+        "workspace": "workspace/user_123",            # 可选，默认按 userId 生成
+        "userId": "user_123",
+
+        # 以下三个字段都是相对 workspace 的路径
+        "userFilesDir": "files",                      # 用户研究输出目录（research_notes/data/charts/reports 都在里面）
+        "userLogsDir": "logs",                        # 日志目录
+        "logDetailPath": "logs/log_detail.jsonl",
+        "logSummaryPath": "logs/log_summary.json",
+        "logRunPath": "logs/log_run.log"
+      }
+    }
+    """
+    workspace: str = ""
+    userId: str
+    userFilesDir: str = "files"
+    userLogsDir: str = "logs"
+    logDetailPath: str = "logs/log_detail.jsonl"
+    logSummaryPath: str = "logs/log_summary.json"
+    logRunPath: str = "logs/log_run.log"
+
+    @property
+    def type(self) -> str:
+        """
+        用于 Processor.match / preprocess_dict 里的 key 区分，
+        避免和原来的 SandboxProcessorData 冲突。
+        """
+        return "ResearchAgentSandbox"
+
+
 @registry.register_processor("sandbox_started_processor")
 class SandboxToVoice(BaseProcessor):
 
