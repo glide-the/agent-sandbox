@@ -122,6 +122,28 @@ class SandboxToVoice(BaseProcessor):
     def match(self, data: ProcessorData):
         return "Sandbox" in data.type
 
+    def init_paths(self, code_input: SandboxProcessorData, task_id: str) -> dict:
+        cwd = self.cwd
+        code_input.evaluatorDir = (Path(cwd) / code_input.evaluatorDir).as_posix()
+        code_input.evaluatorPath = (Path(code_input.evaluatorDir) / code_input.evaluatorPath).as_posix()
+        code_input.standardFileDir = (Path(cwd) / code_input.standardFileDir).as_posix()
+        code_input.standardFilePath = (Path(code_input.standardFileDir) / code_input.standardFilePath).as_posix()
+        code_input.userFileDir = (Path(cwd) / code_input.userFileDir).as_posix()
+        code_input.userFilePath = (Path(code_input.userFileDir) / code_input.userFilePath).as_posix()
+        code_input.userImagesDir = (Path(code_input.userFileDir) / code_input.userImagesDir).as_posix()
+        code_input.logDetailPath = (Path(code_input.evaluatorDir) / code_input.logDetailPath).as_posix()
+        code_input.logSummaryPath = (Path(code_input.evaluatorDir) / code_input.logSummaryPath).as_posix()
+        code_input.logRunPath = (Path(code_input.evaluatorDir) / code_input.logRunPath).as_posix()
+
+        result_path = os.path.join(cwd, code_input.evaluatorDir, code_input.evaluatorPath)
+
+        return {
+            "result_path": result_path,
+            "log_detail_path": code_input.logDetailPath,
+            "log_summary_path": code_input.logSummaryPath,
+            "log_run_path": code_input.logRunPath,
+        }
+
     async def _call_sandbox_start(self, code_input: SandboxProcessorData):
         cwd = self.cwd
         code_input.evaluatorDir = (Path(cwd) / code_input.evaluatorDir).as_posix()
