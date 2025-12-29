@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import os
@@ -8,7 +7,6 @@ import time
 import anyio
 from anyio.streams.text import TextReceiveStream
 from contextlib import asynccontextmanager
-import nest_asyncio
 
 from sandbox.common.registry import registry
 from sandbox.processors import BaseProcessor, ProcessorData
@@ -97,16 +95,14 @@ class SandboxToVoice(BaseProcessor):
     def __init__(self, cwd: str):
         super().__init__()
         self.cwd = cwd
-        nest_asyncio.apply()
 
-    def __call__(
+    async def __call__(
             self,
             code_input: SandboxProcessorData
     ):
-
-        # 同步调用协程代码
-        result_path, log_detail_path, log_summary_path, log_run_path = asyncio.get_event_loop().run_until_complete(
-            self._call_sandbox_start(code_input=code_input))
+        result_path, log_detail_path, log_summary_path, log_run_path = await self._call_sandbox_start(
+            code_input=code_input
+        )
 
         return result_path, log_detail_path, log_summary_path, log_run_path
 

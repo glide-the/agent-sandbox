@@ -6,7 +6,6 @@ import shutil
 from pathlib import Path
 from typing import Dict, Optional
 
-import nest_asyncio
 from dotenv import load_dotenv
 
 from sandbox.common.registry import registry
@@ -73,7 +72,6 @@ class ResearchAgentProcessor(BaseProcessor):
         super().__init__()
         self.cwd = cwd
         self.prompt_overrides = prompts or {}
-        nest_asyncio.apply()
         load_dotenv()
 
     @classmethod
@@ -115,10 +113,9 @@ class ResearchAgentProcessor(BaseProcessor):
             "log_run_path": log_run_file.as_posix(),
         }
 
-    def __call__(self, code_input: ResearchAgentSandboxProcessorData, topic: str):
-        loop = asyncio.get_event_loop()
-        result_path, log_detail_path, log_summary_path, log_run_path = loop.run_until_complete(
-            self._run_research(code_input=code_input, topic=topic)
+    async def __call__(self, code_input: ResearchAgentSandboxProcessorData, topic: str):
+        result_path, log_detail_path, log_summary_path, log_run_path = await self._run_research(
+            code_input=code_input, topic=topic
         )
         return result_path, log_detail_path, log_summary_path, log_run_path
 

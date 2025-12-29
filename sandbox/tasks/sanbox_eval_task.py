@@ -1,4 +1,5 @@
 import hashlib
+import inspect
 import traceback
 from typing import Dict
 
@@ -82,7 +83,10 @@ class SandboxEvalTask(SandboxTaskAbstract):
                     preprocess_object = self.preprocess_dict.get(data.sandbox_input.type)
                     if not preprocess_object.match(data.sandbox_input):
                         raise RuntimeError('不支持的process')
-                    result_path, log_detail_path, log_summary_path, log_run_path = preprocess_object(data.sandbox_input)
+                    preprocess_result = preprocess_object(data.sandbox_input)
+                    if inspect.isawaitable(preprocess_result):
+                        preprocess_result = await preprocess_result
+                    result_path, log_detail_path, log_summary_path, log_run_path = preprocess_result
 
                     # 完成任务，构建响应数据
                     await self.report_progress(task_id=runner.task_id,

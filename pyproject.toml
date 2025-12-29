@@ -33,7 +33,6 @@ claude-agent-sdk = "^0.1.0"
 colorama = ">=0.4.5"
 
 # server
-nest-asyncio = "1.5.6"
 fastapi = "==0.109.2"
 uvicorn = ">=0.27.0.post1"
 pandas = "~2.0.3"
