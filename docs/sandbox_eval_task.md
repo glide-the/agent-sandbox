@@ -223,7 +223,6 @@ minio                7.2.15
 modelscope           1.25.0
 multidict            6.4.3
 multiprocess         0.70.16
-nest-asyncio         1.5.6
 nltk                 3.8.1
 numpy                1.24.4
 omegaconf            2.0.6

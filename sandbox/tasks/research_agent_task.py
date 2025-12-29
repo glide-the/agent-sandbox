@@ -1,4 +1,5 @@
 import hashlib
+import inspect
 from typing import Dict
 
 from sandbox.common.registry import registry
@@ -149,9 +150,10 @@ class ResearchAgentTask(SandboxTaskAbstract):
                     result=init_paths_result,
                 )
 
-            result_path, log_detail_path, log_summary_path, log_run_path = processor(
-                sandbox_input, topic
-            )
+            processor_result = processor(sandbox_input, topic)
+            if inspect.isawaitable(processor_result):
+                processor_result = await processor_result
+            result_path, log_detail_path, log_summary_path, log_run_path = processor_result
 
             await self.report_progress(
                 task_id=runner.task_id,

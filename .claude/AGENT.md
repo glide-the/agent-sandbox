@@ -214,10 +214,11 @@ tail -f logs/web_<timestamp>/start_logger.log
 ## 重要注意事项
 
 1. **异步编程**: 所有任务执行都是异步的，注意使用 `async/await`
-2. **错误处理**: 捕获异常并上报 error 状态
-3. **日志记录**: 使用 `self.logger` 记录重要信息
-4. **资源清理**: 在 `complete()` 方法中清理资源
-5. **状态报告**: 使用 `report_progress()` 上报任务状态
+2. **事件循环**: 项目仅允许一个顶层 `asyncio.run`，不要引入 `nest_asyncio` 或嵌套事件循环
+3. **错误处理**: 捕获异常并上报 error 状态
+4. **日志记录**: 使用 `self.logger` 记录重要信息
+5. **资源清理**: 在 `complete()` 方法中清理资源
+6. **状态报告**: 使用 `report_progress()` 上报任务状态
 
 ## 依赖说明
 
