@@ -265,7 +265,8 @@ class SubagentTracker:
             "tool_name": record.tool_name,
             "success": error is None,
             "error": error,
-            "output_size": len(str(tool_response)) if tool_response else 0
+            "output_size": len(str(tool_response)) if tool_response else 0,
+            "tool_response": tool_response
         })
 
         return {'continue_': True}
