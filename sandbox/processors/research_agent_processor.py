@@ -208,7 +208,7 @@ class ResearchAgentProcessor(BaseProcessor):
                         "for later use by report writers. Ideal for complex research tasks "
                         "that require deep searching and cross-referencing."
                     ),
-                    tools=["WebSearch", "Write", "mcp__data-analyst-mcp__vanna_chat_once", 
+                    tools=["Write", "mcp__data-analyst-mcp__vanna_chat_once", 
                            "mcp__exa-search-mcp__get_code_context_exa",
                            "mcp__exa-search-mcp__web_search_exa"],
                     prompt=researcher_prompt,
