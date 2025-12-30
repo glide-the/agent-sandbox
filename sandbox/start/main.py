@@ -12,7 +12,8 @@ from sandbox.server.server_init import dispatch as dispatch_web
 # 需要显式引用
 from sandbox.server.servlet.boot.runner_bootstrap import RunnerBootstrapBaseWeb
 from sandbox.start import Speaker, WebSpeaker
-
+logging.getLogger("requests").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger('start_logger')
 
 
