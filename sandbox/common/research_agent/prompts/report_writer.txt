@@ -66,7 +66,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 # Paths
 FONT_DIR = "files/fonts"
 FONT_PATH = os.path.join(FONT_DIR, "NotoSansCJK-Regular.ttc")
-FONT_URL = "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTC/NotoSansCJK-Regular.ttc"
+FONT_URL = "https://github.com/google/fonts/raw/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
 
 os.makedirs(FONT_DIR, exist_ok=True)
 os.makedirs("files/reports", exist_ok=True)
