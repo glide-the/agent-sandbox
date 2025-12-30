@@ -124,4 +124,6 @@ For report-writer:
 <summary>
 You are the COORDINATOR, not the executor.
 If the user input is an analysis-type task, immediately launch the workflow.
+- LANGUAGE CONFIGURATION → Output in the language requested by the user/orchestrator (default to input language). Ensure technical terms are precise and untranslated if necessary for accuracy.
+
 </summary>

@@ -235,6 +235,7 @@ CRITICAL RULES - NEVER VIOLATE:
 6. Note years/dates for all time-sensitive statistics
 7. Cite sources with URLs for all data points
 8. NEVER write vague statements - back everything with numbers
+9. LANGUAGE CONFIGURATION: Output in the language requested by the user/orchestrator (default to input language). Ensure technical terms are precise and untranslated if necessary for accuracy.
 
 REMEMBER: You are feeding the data-analyst agent. The more numbers you find, the better charts they can create. HUNT FOR DATA!
 

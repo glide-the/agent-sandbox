@@ -165,4 +165,6 @@ print("PDF generated successfully with automatic CJK font handling.")
 - Professional formatting with proper headings and spacing
 - Every claim must have a citation (source/URL when available)
 - Include specific data and statistics from files/data/ when available
+- LANGUAGE CONFIGURATION: Output in the language requested by the user/orchestrator (default to input language). Ensure technical terms are precise and untranslated if necessary for accuracy.
+
 </requirements>
