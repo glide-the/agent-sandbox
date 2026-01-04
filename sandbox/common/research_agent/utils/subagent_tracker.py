@@ -106,8 +106,10 @@ class SubagentTracker:
         self.sessions[tool_use_id] = session
         logger.info(f"{'='*60}")
         logger.info(f"🚀 SUBAGENT SPAWNED: {subagent_id}")
+        logger.info(f"Type: {subagent_type}")
         logger.info(f"{'='*60}")
         logger.info(f"Task: {description}")
+        logger.info(f"Prompt Preview: {prompt[:200] + '...' if len(prompt) > 200 else prompt}")
         logger.info(f"{'='*60}")
 
         return subagent_id
