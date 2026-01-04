@@ -240,7 +240,7 @@ class ResearchAgentProcessor(BaseProcessor):
                     ),
                     tools=["Skill", "Write", "Glob", "Read", "Bash"],
                     prompt=report_writer_prompt,
-                    model="haiku",
+                    model="sonnet",
                 ),
             }
 
@@ -268,7 +268,7 @@ class ResearchAgentProcessor(BaseProcessor):
                     allowed_tools=["Task", "mcp__data-analyst-mcp__vanna_chat_once"],
                     agents=agents,
                     hooks=hooks,
-                    model="haiku",
+                    model="sonnet",
                 )
             else:
                 options = ResearchAgentProcessor._options
