@@ -1,3 +1,4 @@
+
 # Research Agent Task API 文档
 
 ## 概述
@@ -218,14 +219,10 @@ GET /runner/result?task_id={task_id}
     "info": "completed",
     "finished": true,
     "result": {
-      "topic": "请调研并研究安徽省数字资产交易如何在十五五计划中进一步发展推进",
-      "workspace": "/app/sandbox/workspace/user_123",
-      "reports_dir": "/app/sandbox/workspace/user_123/files/reports",
-      "logs": {
-        "detail": "/app/sandbox/workspace/user_123/logs/log_detail.jsonl",
-        "summary": "/app/sandbox/workspace/user_123/logs/log_summary.json",
-        "run": "/app/sandbox/workspace/user_123/logs/log_run.log"
-      }
+            "result_path": "/Users/dmeck/project/agent-sandbox/app/sandbox/workspace4/user_789/logs/result.json",
+            "log_detail_path": "/Users/dmeck/project/agent-sandbox/app/sandbox/workspace4/user_789/logs/log_detail.jsonl",
+            "log_summary_path": "/Users/dmeck/project/agent-sandbox/app/sandbox/workspace4/user_789/logs/log_summary.json",
+            "log_run_path": "/Users/dmeck/project/agent-sandbox/app/sandbox/workspace4/user_789/logs/log_run.log"
     }
   }
 }
@@ -262,12 +259,7 @@ GET /runner/result?task_id={task_id}
 | `data.info` | string | 任务状态信息 |
 | `data.finished` | boolean | 任务是否完成 |
 | `data.result` | object | 任务结果（仅当任务完成时存在） |
-| `data.result.topic` | string | 研究主题 |
-| `data.result.workspace` | string | 工作空间绝对路径 |
-| `data.result.reports_dir` | string | 报告输出目录 |
-| `data.result.logs.detail` | string | 详细日志文件路径 |
-| `data.result.logs.summary` | string | 日志摘要文件路径 |
-| `data.result.logs.run` | string | 运行日志文件路径 |
+| `data.result....` | string | 任务文件（field_name） |
 
 ### 示例代码
 
@@ -606,7 +598,7 @@ workspace/
 
 **解决**: 检查请求体格式，确保必填字段完整
 
----
+--- 
 
 ## 附录
 
