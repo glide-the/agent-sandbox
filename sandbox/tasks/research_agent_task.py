@@ -91,7 +91,8 @@ class ResearchAgentTask(SandboxTaskAbstract):
                 running_task_ids = runner_bootstrap_web.get_user_running_tasks(user_id)
                 running_task_text = ", ".join(sorted(running_task_ids))
                 raise TaskRejectedError(
-                    f"user {user_id} already has running tasks: {running_task_text}"
+                    running_task_ids=running_task_ids,
+                    message=f"user {user_id} already has running tasks: {running_task_text}"
                 )
 
         sandbox_input = ResearchAgentSandboxProcessorData(**code_input)
