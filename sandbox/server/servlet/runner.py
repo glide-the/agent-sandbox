@@ -52,7 +52,7 @@ async def submit_async(payload: PayLoad):
     try:
         runner = task.prepare(payload=payload)
     except TaskRejectedError as exc:
-        task_state = runner_bootstrap_web.task_states[exc.running_task_ids[0]] if exc.running_task_ids else {}
+        task_state = runner_bootstrap_web.task_states[exc.running_task_ids.pop()] if exc.running_task_ids else {}
         return TaskRunnerResponse(code=409, msg=str(exc), data=task_state)
     task_id = runner.task_id
 
