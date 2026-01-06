@@ -194,7 +194,7 @@ class ResearchAgentProcessor(BaseProcessor):
             session_dir.mkdir(parents=True, exist_ok=True)
             tracker = SubagentTracker(transcript_writer=transcript_writer, session_dir=session_dir)
 
-            lead_agent_prompt = self._resolve_prompt("lead_agent.txt", "lead_agent")
+            lead_agent_prompt = self._resolve_prompt("lead_agent_qa.txt", "lead_agent")
             researcher_prompt = self._resolve_prompt("researcher_SAAD-SOP.txt", "researcher")
             data_analyst_prompt = self._resolve_prompt("data_analyst.txt", "data_analyst")
             report_writer_prompt = self._resolve_prompt("report_writer.txt", "report_writer")
