@@ -140,6 +140,50 @@ class ResearchAgentProcessor(BaseProcessor):
 
         return load_prompt(default_filename)
 
+    def _generate_directory_tree(self, root_path: Path, max_depth: int = 3) -> dict:
+        """
+        Generate a hierarchical tree structure of the directory.
+
+        :param root_path: The root directory to scan
+        :param max_depth: Maximum depth to traverse (default: 3)
+        :return: Dictionary representing the directory tree
+        """
+        def build_tree(path: Path, current_depth: int = 0) -> dict:
+            if current_depth >= max_depth or not path.is_dir():
+                return {"name": path.name, "type": "file" if path.is_file() else "directory"}
+
+            tree = {"name": path.name, "type": "directory", "children": []}
+
+            try:
+                # Sort entries: directories first, then files
+                entries = sorted(
+                    path.iterdir(),
+                    key=lambda p: (not p.is_dir(), p.name.lower())
+                )
+
+                for entry in entries:
+                    # Skip hidden files/directories (except .claude and .mcp.json)
+                    if entry.name.startswith('.') and entry.name not in ['.claude', '.mcp.json']:
+                        continue
+
+                    if entry.is_dir():
+                        tree["children"].append(build_tree(entry, current_depth + 1))
+                    else:
+                        # Only include files, not their contents
+                        tree["children"].append({
+                            "name": entry.name,
+                            "type": "file",
+                            "size": entry.stat().st_size if entry.exists() else 0
+                        })
+            except PermissionError:
+                tree["error"] = "Permission denied"
+            except Exception as e:
+                tree["error"] = str(e)
+
+            return tree
+
+        return build_tree(root_path)
+
     def _init_workspace(self, code_input: ResearchAgentSandboxProcessorData) -> Path:
         cwd = Path(self.cwd)
 
@@ -315,6 +359,38 @@ class ResearchAgentProcessor(BaseProcessor):
             result_path = (log_summary_file.parent / "result.json").as_posix()
             Path(result_path).parent.mkdir(parents=True, exist_ok=True)
 
+            # Generate directory tree structure
+            directory_tree = self._generate_directory_tree(workspace)
+
+            # Directory structure with descriptions
+            directory_structure = {
+                "files/research_notes/": {
+                    "path": str(workspace / code_input.userFilesDir / "research_notes"),
+                    "purpose": "输入源：存放待读取的 Markdown 研究笔记。",
+                    "type": "input"
+                },
+                "files/charts/": {
+                    "path": str(workspace / code_input.userFilesDir / "charts"),
+                    "purpose": "输出/存图：存放生成的 Python 图表及 SSE 下载的图片资源。",
+                    "type": "output"
+                },
+                "files/data/": {
+                    "path": str(workspace / code_input.userFilesDir / "data"),
+                    "purpose": "输出/存数：存放生成的 data_summary.md、下载的数据文件（CSV/XLSX等）。",
+                    "type": "output"
+                },
+                "files/assets/": {
+                    "path": str(workspace / code_input.userFilesDir / "assets"),
+                    "purpose": "备用存图：存放非图表类的通用图片或资源。",
+                    "type": "storage"
+                },
+                "files/reports/": {
+                    "path": str(workspace / code_input.userFilesDir / "reports"),
+                    "purpose": "输出/报告：存放生成的 PDF 研究报告。",
+                    "type": "output"
+                },
+            }
+
             result_payload = {
                 "topic": topic,
                 "workspace": str(workspace),
@@ -324,6 +400,15 @@ class ResearchAgentProcessor(BaseProcessor):
                     "summary": code_input.logSummaryPath,
                     "run": code_input.logRunPath,
                 },
+                "environment": {
+                    "workspace": str(workspace),
+                    "user_id": code_input.userId,
+                    "user_files_dir": str(workspace / code_input.userFilesDir),
+                    "user_logs_dir": str(workspace / code_input.userLogsDir),
+                    "current_working_directory": str(Path.cwd()),
+                },
+                "directory_structure": directory_structure,
+                "directory_tree": directory_tree,
             }
 
             with open(result_path, "w", encoding="utf-8") as handle:
