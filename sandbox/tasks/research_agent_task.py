@@ -99,7 +99,7 @@ class ResearchAgentTask(SandboxTaskAbstract):
         sandbox_input = ResearchAgentSandboxProcessorData(**code_input)
         flow_data = ResearchAgentFlowData(sandbox_input=sandbox_input, topic=topic)
 
-        raw_id = f"{sandbox_input.userId}_{payload.created_at}_{_md5(str(sandbox_input) + topic)}"
+        raw_id = f"{sandbox_input.userId}_{int(payload.created_at)}_{_md5(str(sandbox_input) + topic)}"
         task_id = raw_id
 
         runner = Runner(
