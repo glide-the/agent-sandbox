@@ -86,14 +86,15 @@ class ResearchAgentTask(SandboxTaskAbstract):
                 runner_bootstrap_web = get_bootstrap("runner_bootstrap_web")
             except ValueError:
                 runner_bootstrap_web = None
-
-            if runner_bootstrap_web and runner_bootstrap_web.user_has_running_task(user_id):
-                running_task_ids = runner_bootstrap_web.get_user_running_tasks(user_id)
-                running_task_text = ", ".join(sorted(running_task_ids))
-                raise TaskRejectedError(
-                    running_task_ids=running_task_ids,
-                    message=f"user {user_id} already has running tasks: {running_task_text}"
-                )
+            if payload.parameter.user_multi_task is False:
+                    
+                if runner_bootstrap_web and runner_bootstrap_web.user_has_running_task(user_id):
+                    running_task_ids = runner_bootstrap_web.get_user_running_tasks(user_id)
+                    running_task_text = ", ".join(sorted(running_task_ids))
+                    raise TaskRejectedError(
+                        running_task_ids=running_task_ids,
+                        message=f"user {user_id} already has running tasks: {running_task_text}"
+                    )
 
         sandbox_input = ResearchAgentSandboxProcessorData(**code_input)
         flow_data = ResearchAgentFlowData(sandbox_input=sandbox_input, topic=topic)

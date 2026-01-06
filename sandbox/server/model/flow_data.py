@@ -47,6 +47,8 @@ class BaseFlowData(BaseModel):
 class RunnerParameter(BaseModel):
     task_name: str = Field(default="sandbox_eval_task")
     reset: bool = Field(default=True)
+    # 用户是否允许多任务并行，默认不允许
+    user_multi_task: bool = Field(default=False)
 
 
 class SandboxEvalFlowData(BaseModel):
