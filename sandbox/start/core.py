@@ -86,7 +86,8 @@ class WebSpeaker(Speaker):
 
         self.remote_infos = remote_infos
         self.nonce = nonce
-        self._task_results = {}
+        self._task_results = {}  # 存储所有正在处理的任务 {key: {"task_id": str, "data": dict, "status": "processing"/"completed"}}
+        self._completed_tasks = set()  # 记录已完成的任务ID，用于清理
 
     async def listen(self):
         """
@@ -134,6 +135,10 @@ class WebSpeaker(Speaker):
                     else:
                         break
 
+            # 如果任务完成，标记为已完成
+            if finished:
+                self._completed_tasks.add(task_id)
+
         for key, task in tasks_cache.items():
             task.add_progress_hook(sync_state)
 
@@ -151,24 +156,55 @@ class WebSpeaker(Speaker):
                 await asyncio.sleep(0.1)
                 continue
 
-            self._task_results = self._get_task()
+            # 获取新任务（不覆盖已有任务）
+            new_tasks = self._get_task()
 
-            has_valid_task = False
-            if self._task_results:
-                for key, task_info in self._task_results.items():
+            # 合并新任务到处理队列中
+            if new_tasks:
+                for key, task_info in new_tasks.items():
+                    # 只添加新任务，不覆盖正在处理的任务
                     if task_info and task_info.get("task_id"):
-                        has_valid_task = True
-                        break
+                        task_id = task_info.get("task_id")
+                        # 检查是否已经在处理队列中
+                        if key not in self._task_results or self._task_results[key].get("task_id") != task_id:
+                            # 如果是新任务且未完成，添加到处理队列
+                            if task_id not in self._completed_tasks:
+                                self._task_results[key] = {
+                                    "task_id": task_id,
+                                    "data": task_info.get("data"),
+                                    "status": "processing"
+                                }
+                                logger.info(f"Added new task {task_id} to processing queue for {key}")
+
+            # 清理已完成的任务
+            for key in list(self._task_results.keys()):
+                task_info = self._task_results[key]
+                task_id = task_info.get("task_id")
+                if task_id in self._completed_tasks:
+                    logger.info(f"Removing completed task {task_id} from {key}")
+                    del self._task_results[key]
+                    self._completed_tasks.discard(task_id)
+
+            # 检查是否有有效任务需要处理
+            has_valid_task = False
+            for key, task_info in self._task_results.items():
+                if task_info and task_info.get("task_id") and task_info.get("status") == "processing":
+                    has_valid_task = True
+                    break
 
             if not has_valid_task:
                 await asyncio.sleep(1)
                 continue
 
+            # 调度任务
             for key, remote_info in self.remote_infos.items():
                 task_info = self._task_results.get(key)
-                if not task_info or not task_info.get("task_id"):
+                if not task_info or task_info.get("status") != "processing":
                     continue
+
                 task_id = task_info.get("task_id")
+                # 标记任务为已调度，避免重复调度
+                self._task_results[key]["status"] = "scheduled"
 
                 try:
                     payload_obj = PayLoad.parse_obj(task_info.get("data"))
@@ -177,6 +213,8 @@ class WebSpeaker(Speaker):
                     task.add_done_callback(background_tasks.discard)
                 except Exception as e:
                     logger.error(f"Failed to schedule task {task_id}: {e}")
+                    # 调度失败，重置状态以便重试
+                    self._task_results[key]["status"] = "processing"
 
             await asyncio.sleep(0.01)
 
