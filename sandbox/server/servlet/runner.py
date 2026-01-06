@@ -167,7 +167,7 @@ async def result_source_async(
         task_state = runner_bootstrap_web.task_states[task_id]
         result = task_state.get("result")
         filepath = result.get(result_source_name)
-        logger.info(f'Task  {task_id} result_async {filepath}')
+        logger.debug(f'Task  {task_id} result_async {filepath}')
         if os.path.exists(filepath):
             return FileResponse(
                 path=filepath,
