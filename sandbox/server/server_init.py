@@ -107,7 +107,7 @@ async def dispatch(speakers_config_file: str, nonce: str = None):
             to_del_task_ids = set()
             for tid, s in runner.task_states.items():
                 payload = runner.task_data[tid]
-                logger.info(f'Checking now: {now}, task_id: {tid}, state: {s}, payload: {payload}')
+                logger.debug(f'Checking now: {now}, task_id: {tid}, state: {s}, payload: {payload}')
                 # Remove finished tasks
                 if s['finished'] \
                         and (s['info'] == 'end' or s['info'] == 'error') \

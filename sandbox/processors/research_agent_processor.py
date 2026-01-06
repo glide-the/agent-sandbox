@@ -96,6 +96,7 @@ class ResearchAgentProcessor(BaseProcessor):
         - workspace 目录
         - 日志目录（logDetailPath / logSummaryPath / logRunPath）
         - result.json 路径
+        - 初始化 log_summary_file 结构
         """
         workspace = self._init_workspace(code_input)
 
@@ -106,11 +107,24 @@ class ResearchAgentProcessor(BaseProcessor):
         result_path = (log_summary_file.parent / "result.json").as_posix()
         Path(result_path).parent.mkdir(parents=True, exist_ok=True)
 
+        # 使用通用方法构建初始 summary 结构
+        initial_summary = self._build_summary_structure(
+            workspace=workspace,
+            code_input=code_input,
+            topic="",
+            assistant_summary=""
+        )
+
+        # 写入初始结构到 log_summary_file
+        with log_summary_file.open("w", encoding="utf-8") as handle:
+            json.dump(initial_summary, handle, ensure_ascii=False, indent=2)
+
         return {
             "result_path": result_path,
             "log_detail_path": log_detail_file.as_posix(),
             "log_summary_path": log_summary_file.as_posix(),
             "log_run_path": log_run_file.as_posix(),
+            "workspace": str(workspace),
         }
 
     async def __call__(self, code_input: ResearchAgentSandboxProcessorData, topic: str):
@@ -139,6 +153,80 @@ class ResearchAgentProcessor(BaseProcessor):
                 return handle.read().strip()
 
         return load_prompt(default_filename)
+
+    def _build_directory_structure(self, workspace: Path, user_files_dir: str) -> dict:
+        """
+        构建目录结构元数据（通用方法）
+
+        :param workspace: 工作区路径
+        :param user_files_dir: 用户文件目录名
+        :return: 目录结构字典
+        """
+        return {
+            "files/research_notes/": {
+                "path": str(workspace / user_files_dir / "research_notes"),
+                "purpose": "输入源：存放待读取的 Markdown 研究笔记。",
+                "type": "input"
+            },
+            "files/charts/": {
+                "path": str(workspace / user_files_dir / "charts"),
+                "purpose": "输出/存图：存放生成的 Python 图表及 SSE 下载的图片资源。",
+                "type": "output"
+            },
+            "files/data/": {
+                "path": str(workspace / user_files_dir / "data"),
+                "purpose": "输出/存数：存放生成的 data_summary.md、下载的数据文件（CSV/XLSX等）。",
+                "type": "output"
+            },
+            "files/assets/": {
+                "path": str(workspace / user_files_dir / "assets"),
+                "purpose": "备用存图：存放非图表类的通用图片或资源。",
+                "type": "storage"
+            },
+            "files/reports/": {
+                "path": str(workspace / user_files_dir / "reports"),
+                "purpose": "输出/报告：存放生成的 PDF 研究报告。",
+                "type": "output"
+            },
+        }
+
+    def _build_summary_structure(self, workspace: Path, code_input: ResearchAgentSandboxProcessorData, topic: str = "", assistant_summary: str = "") -> dict:
+        """
+        构建 summary/result 结构（通用方法）
+
+        :param workspace: 工作区路径
+        :param code_input: 处理器数据输入
+        :param topic: 研究主题（可选）
+        :param assistant_summary: 助手摘要（可选）
+        :return: 完整的摘要结构字典
+        """
+        directory_tree = self._generate_directory_tree(workspace)
+        directory_structure = self._build_directory_structure(workspace, code_input.userFilesDir)
+
+        summary = {
+            "topic": topic,
+            "workspace": str(workspace),
+            "reports_dir": str(workspace / code_input.userFilesDir / "reports"),
+            "logs": {
+                "detail": code_input.logDetailPath,
+                "summary": code_input.logSummaryPath,
+                "run": code_input.logRunPath,
+            },
+            "environment": {
+                "workspace": str(workspace),
+                "user_id": code_input.userId,
+                "user_files_dir": str(workspace / code_input.userFilesDir),
+                "user_logs_dir": str(workspace / code_input.userLogsDir),
+                "current_working_directory": str(Path.cwd()),
+            },
+            "directory_structure": directory_structure,
+            "directory_tree": directory_tree,
+        }
+
+        if assistant_summary or topic == "":
+            summary["assistant_summary"] = assistant_summary
+
+        return summary
 
     def _generate_directory_tree(self, root_path: Path, max_depth: int = 3) -> dict:
         """
@@ -342,74 +430,22 @@ class ResearchAgentProcessor(BaseProcessor):
                         log_detail_file.unlink()
                     tool_log_default.rename(log_detail_file)
 
-            summary = {
-                "topic": topic,
-                "workspace": str(workspace),
-                "reports_dir": str(workspace / code_input.userFilesDir / "reports"),
-                "logs": {
-                    "detail": code_input.logDetailPath,
-                    "summary": code_input.logSummaryPath,
-                    "run": code_input.logRunPath,
-                },
-                "assistant_summary": transcript_writer.buffer,
-            }
+            # 使用通用方法构建 summary 结构
+            summary = self._build_summary_structure(
+                workspace=workspace,
+                code_input=code_input,
+                topic=topic,
+                assistant_summary=transcript_writer.buffer
+            )
+
             with log_summary_file.open("w", encoding="utf-8") as handle:
                 json.dump(summary, handle, ensure_ascii=False, indent=2)
 
             result_path = (log_summary_file.parent / "result.json").as_posix()
             Path(result_path).parent.mkdir(parents=True, exist_ok=True)
 
-            # Generate directory tree structure
-            directory_tree = self._generate_directory_tree(workspace)
-
-            # Directory structure with descriptions
-            directory_structure = {
-                "files/research_notes/": {
-                    "path": str(workspace / code_input.userFilesDir / "research_notes"),
-                    "purpose": "输入源：存放待读取的 Markdown 研究笔记。",
-                    "type": "input"
-                },
-                "files/charts/": {
-                    "path": str(workspace / code_input.userFilesDir / "charts"),
-                    "purpose": "输出/存图：存放生成的 Python 图表及 SSE 下载的图片资源。",
-                    "type": "output"
-                },
-                "files/data/": {
-                    "path": str(workspace / code_input.userFilesDir / "data"),
-                    "purpose": "输出/存数：存放生成的 data_summary.md、下载的数据文件（CSV/XLSX等）。",
-                    "type": "output"
-                },
-                "files/assets/": {
-                    "path": str(workspace / code_input.userFilesDir / "assets"),
-                    "purpose": "备用存图：存放非图表类的通用图片或资源。",
-                    "type": "storage"
-                },
-                "files/reports/": {
-                    "path": str(workspace / code_input.userFilesDir / "reports"),
-                    "purpose": "输出/报告：存放生成的 PDF 研究报告。",
-                    "type": "output"
-                },
-            }
-
-            result_payload = {
-                "topic": topic,
-                "workspace": str(workspace),
-                "reports_dir": str(workspace / code_input.userFilesDir / "reports"),
-                "logs": {
-                    "detail": code_input.logDetailPath,
-                    "summary": code_input.logSummaryPath,
-                    "run": code_input.logRunPath,
-                },
-                "environment": {
-                    "workspace": str(workspace),
-                    "user_id": code_input.userId,
-                    "user_files_dir": str(workspace / code_input.userFilesDir),
-                    "user_logs_dir": str(workspace / code_input.userLogsDir),
-                    "current_working_directory": str(Path.cwd()),
-                },
-                "directory_structure": directory_structure,
-                "directory_tree": directory_tree,
-            }
+            # result_payload uses the same structure as summary (without assistant_summary)
+            result_payload = {k: v for k, v in summary.items() if k != "assistant_summary"}
 
             with open(result_path, "w", encoding="utf-8") as handle:
                 json.dump(result_payload, handle, ensure_ascii=False, indent=2)
