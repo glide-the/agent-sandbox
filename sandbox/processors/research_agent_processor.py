@@ -413,9 +413,22 @@ class ResearchAgentProcessor(BaseProcessor):
 
             transcript_writer.write("\nAgent: ", end="")
 
+            message_count = 0
             async for msg in client.receive_response():
                 if type(msg).__name__ == "AssistantMessage":
                     process_assistant_message(msg, tracker, transcript_writer)
+
+                    # Update directory_tree dynamically every 10 messages
+                    message_count += 1
+                    if message_count % 10 == 0:
+                        intermediate_summary = self._build_summary_structure(
+                            workspace=workspace,
+                            code_input=code_input,
+                            topic=topic,
+                            assistant_summary=transcript_writer.buffer
+                        )
+                        with log_summary_file.open("w", encoding="utf-8") as handle:
+                            json.dump(intermediate_summary, handle, ensure_ascii=False, indent=2)
 
             transcript_writer.write("\n")
             transcript_writer.write("\n\nGoodbye!\n")
