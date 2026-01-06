@@ -152,7 +152,7 @@ class ResearchAgentTask(SandboxTaskAbstract):
                     result=init_paths_result,
                 )
 
-            processor_result = processor(sandbox_input, topic)
+            processor_result = processor(sandbox_input, runner.task_id, topic)
             if inspect.isawaitable(processor_result):
                 processor_result = await processor_result
             result_path, log_detail_path, log_summary_path, log_run_path = processor_result

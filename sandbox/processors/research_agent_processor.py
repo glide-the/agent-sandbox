@@ -98,7 +98,7 @@ class ResearchAgentProcessor(BaseProcessor):
         - result.json 路径
         - 初始化 log_summary_file 结构
         """
-        workspace = self._init_workspace(code_input)
+        workspace = self._init_workspace(code_input, task_id)
 
         log_detail_file = Path(code_input.logDetailPath)
         log_summary_file = Path(code_input.logSummaryPath)
@@ -127,9 +127,9 @@ class ResearchAgentProcessor(BaseProcessor):
             "workspace": str(workspace),
         }
 
-    async def __call__(self, code_input: ResearchAgentSandboxProcessorData, topic: str):
+    async def __call__(self, code_input: ResearchAgentSandboxProcessorData, task_id: str, topic: str):
         result_path, log_detail_path, log_summary_path, log_run_path = await self._run_research(
-            code_input=code_input, topic=topic
+            code_input=code_input, task_id=task_id, topic=topic
         )
         return result_path, log_detail_path, log_summary_path, log_run_path
 
@@ -272,15 +272,15 @@ class ResearchAgentProcessor(BaseProcessor):
 
         return build_tree(root_path)
 
-    def _init_workspace(self, code_input: ResearchAgentSandboxProcessorData) -> Path:
+    def _init_workspace(self, code_input: ResearchAgentSandboxProcessorData, task_id: str) -> Path:
         cwd = Path(self.cwd)
 
         if code_input.workspace:
             workspace = Path(code_input.workspace)
             if not workspace.is_absolute():
-                workspace = cwd / workspace / code_input.userId
+                workspace = cwd / workspace / task_id
         else:
-            workspace = cwd / "workspace" / code_input.userId
+            workspace = cwd / "workspace" / task_id
 
         workspace.mkdir(parents=True, exist_ok=True)
 
@@ -309,8 +309,8 @@ class ResearchAgentProcessor(BaseProcessor):
 
         return workspace
 
-    async def _run_research(self, code_input: ResearchAgentSandboxProcessorData, topic: str):
-        workspace = self._init_workspace(code_input)
+    async def _run_research(self, code_input: ResearchAgentSandboxProcessorData, task_id: str, topic: str):
+        workspace = self._init_workspace(code_input, task_id)
 
         original_cwd = Path.cwd()
         os.chdir(workspace)
