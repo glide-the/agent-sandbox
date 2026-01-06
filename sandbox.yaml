@@ -37,5 +37,5 @@ bootstrap:
       host: "0.0.0.0"
       port: 10000
       max_ongoing_tasks: 10
-      web_client_timeout: 1800
-      finished_task_remove_timeout: 100
+      web_client_timeout: 18000
+      finished_task_remove_timeout: 10000

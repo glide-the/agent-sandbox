@@ -107,7 +107,7 @@ async def dispatch(speakers_config_file: str, nonce: str = None):
             to_del_task_ids = set()
             for tid, s in runner.task_states.items():
                 payload = runner.task_data[tid]
-                logger.debug(f'Checking now: {now}, task_id: {tid}, state: {s}, payload: {payload}')
+                logger.info(f'Checking now: {now}, task_id: {tid}, state: {s}, payload: {payload}')
                 # Remove finished tasks
                 if s['finished'] \
                         and (s['info'] == 'end' or s['info'] == 'error') \
@@ -118,7 +118,7 @@ async def dispatch(speakers_config_file: str, nonce: str = None):
                 elif WEB_CLIENT_TIMEOUT >= 0:
                     if tid not in runner.ongoing_tasks and not s['finished'] \
                             and (now - payload.requested_at) > WEB_CLIENT_TIMEOUT:
-                        logger.debug(f'REMOVING TASK，{tid}' )
+                        logger.info(f'REMOVING TASK，{tid}' )
                         to_del_task_ids.add(tid)
                         try:
                             runner.queue.remove(tid)
@@ -126,7 +126,7 @@ async def dispatch(speakers_config_file: str, nonce: str = None):
                             pass
 
             for tid in to_del_task_ids:
-                logger.debug(f'Removing task {tid} from queue')
+                logger.info(f'Removing task {tid} from queue')
                 # Remove task from queue
                 payload = runner.task_data.get(tid)
                 if payload:
