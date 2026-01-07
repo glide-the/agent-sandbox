@@ -17,9 +17,16 @@ from sandbox.processors import (
 
 from sandbox.common.research_agent.utils.subagent_tracker import SubagentTracker
 from sandbox.common.research_agent.utils.transcript import TranscriptWriter
-from sandbox.common.research_agent.utils.message_handler import process_assistant_message
+from sandbox.common.research_agent.utils.message_handler import (
+    process_assistant_message,
+)
 from sandbox.common.research_agent import load_prompt
-from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AgentDefinition, HookMatcher
+from claude_agent_sdk import (
+    ClaudeSDKClient,
+    ClaudeAgentOptions,
+    AgentDefinition,
+    HookMatcher,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +61,6 @@ class ResearchAgentProcessor(BaseProcessor):
     无需子进程。
     """
 
-    _client: Optional["ClaudeSDKClient"] = None
-    _options: Optional["ClaudeAgentOptions"] = None
-    _client_lock = asyncio.Lock()
-
     def __init__(self, cwd: str, prompts: Optional[Dict[str, str]] = None):
         """
         :param cwd: sandbox 的工作根目录（由 YAML 配置中的 cwd 控制）
@@ -90,7 +93,9 @@ class ResearchAgentProcessor(BaseProcessor):
     def match(self, data: ProcessorData):
         return getattr(data, "type", "") == "ResearchAgentSandbox"
 
-    def init_paths(self, code_input: ResearchAgentSandboxProcessorData, task_id: str) -> dict:
+    def init_paths(
+        self, code_input: ResearchAgentSandboxProcessorData, task_id: str
+    ) -> dict:
         """
         利用现有 _init_workspace 逻辑，基于 code_input 初始化：
         - workspace 目录
@@ -109,10 +114,7 @@ class ResearchAgentProcessor(BaseProcessor):
 
         # 使用通用方法构建初始 summary 结构
         initial_summary = self._build_summary_structure(
-            workspace=workspace,
-            code_input=code_input,
-            topic="",
-            assistant_summary=""
+            workspace=workspace, code_input=code_input, topic="", assistant_summary=""
         )
 
         # 写入初始结构到 log_summary_file
@@ -127,23 +129,34 @@ class ResearchAgentProcessor(BaseProcessor):
             "workspace": str(workspace),
         }
 
-    async def __call__(self, code_input: ResearchAgentSandboxProcessorData, task_id: str, topic: str):
-        result_path, log_detail_path, log_summary_path, log_run_path = await self._run_research(
+    async def __call__(
+        self, code_input: ResearchAgentSandboxProcessorData, task_id: str, topic: str
+    ):
+        (
+            result_path,
+            log_detail_path,
+            log_summary_path,
+            log_run_path,
+        ) = await self._run_research(
             code_input=code_input, task_id=task_id, topic=topic
         )
         return result_path, log_detail_path, log_summary_path, log_run_path
 
-    async def _ensure_client(self, options: "ClaudeAgentOptions") -> "ClaudeSDKClient":
-        if ResearchAgentProcessor._client is not None:
-            return ResearchAgentProcessor._client
+    async def _create_client(self, options: "ClaudeAgentOptions") -> "ClaudeSDKClient":
+        """
+        创建新的 Claude SDK 客户端实例（每个任务独立）
 
-        async with self._client_lock:
-            if ResearchAgentProcessor._client is None:
-                client = ClaudeSDKClient(options=options)
-                ResearchAgentProcessor._client = await client.__aenter__()
-                ResearchAgentProcessor._options = options
+        Args:
+            options: Claude SDK 客户端配置选项
 
-        return ResearchAgentProcessor._client
+        Returns:
+            已连接的 Claude SDK 客户端实例
+        """
+        client = ClaudeSDKClient(options=options)
+        logger.info(f"Creating new Claude SDK client with cwd: {options.cwd}")
+        await client.__aenter__()
+        logger.info("Claude SDK client created and connected successfully")
+        return client
 
     def _resolve_prompt(self, default_filename: str, override_key: str) -> str:
         override_path = self.prompt_overrides.get(override_key)
@@ -166,31 +179,37 @@ class ResearchAgentProcessor(BaseProcessor):
             "files/research_notes/": {
                 "path": str(workspace / user_files_dir / "research_notes"),
                 "purpose": "输入源：存放待读取的 Markdown 研究笔记。",
-                "type": "input"
+                "type": "input",
             },
             "files/charts/": {
                 "path": str(workspace / user_files_dir / "charts"),
                 "purpose": "输出/存图：存放生成的 Python 图表及 SSE 下载的图片资源。",
-                "type": "output"
+                "type": "output",
             },
             "files/data/": {
                 "path": str(workspace / user_files_dir / "data"),
                 "purpose": "输出/存数：存放生成的 data_summary.md、下载的数据文件（CSV/XLSX等）。",
-                "type": "output"
+                "type": "output",
             },
             "files/assets/": {
                 "path": str(workspace / user_files_dir / "assets"),
                 "purpose": "备用存图：存放非图表类的通用图片或资源。",
-                "type": "storage"
+                "type": "storage",
             },
             "files/reports/": {
                 "path": str(workspace / user_files_dir / "reports"),
                 "purpose": "输出/报告：存放生成的 PDF 研究报告。",
-                "type": "output"
+                "type": "output",
             },
         }
 
-    def _build_summary_structure(self, workspace: Path, code_input: ResearchAgentSandboxProcessorData, topic: str = "", assistant_summary: str = "") -> dict:
+    def _build_summary_structure(
+        self,
+        workspace: Path,
+        code_input: ResearchAgentSandboxProcessorData,
+        topic: str = "",
+        assistant_summary: str = "",
+    ) -> dict:
         """
         构建 summary/result 结构（通用方法）
 
@@ -201,7 +220,9 @@ class ResearchAgentProcessor(BaseProcessor):
         :return: 完整的摘要结构字典
         """
         directory_tree = self._generate_directory_tree(workspace)
-        directory_structure = self._build_directory_structure(workspace, code_input.userFilesDir)
+        directory_structure = self._build_directory_structure(
+            workspace, code_input.userFilesDir
+        )
 
         summary = {
             "topic": topic,
@@ -236,33 +257,41 @@ class ResearchAgentProcessor(BaseProcessor):
         :param max_depth: Maximum depth to traverse (default: 3)
         :return: Dictionary representing the directory tree
         """
+
         def build_tree(path: Path, current_depth: int = 0) -> dict:
             if current_depth >= max_depth or not path.is_dir():
-                return {"name": path.name, "type": "file" if path.is_file() else "directory"}
+                return {
+                    "name": path.name,
+                    "type": "file" if path.is_file() else "directory",
+                }
 
             tree = {"name": path.name, "type": "directory", "children": []}
 
             try:
                 # Sort entries: directories first, then files
                 entries = sorted(
-                    path.iterdir(),
-                    key=lambda p: (not p.is_dir(), p.name.lower())
+                    path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())
                 )
 
                 for entry in entries:
                     # Skip hidden files/directories (except .claude and .mcp.json)
-                    if entry.name.startswith('.') and entry.name not in ['.claude', '.mcp.json']:
+                    if entry.name.startswith(".") and entry.name not in [
+                        ".claude",
+                        ".mcp.json",
+                    ]:
                         continue
 
                     if entry.is_dir():
                         tree["children"].append(build_tree(entry, current_depth + 1))
                     else:
                         # Only include files, not their contents
-                        tree["children"].append({
-                            "name": entry.name,
-                            "type": "file",
-                            "size": entry.stat().st_size if entry.exists() else 0
-                        })
+                        tree["children"].append(
+                            {
+                                "name": entry.name,
+                                "type": "file",
+                                "size": entry.stat().st_size if entry.exists() else 0,
+                            }
+                        )
             except PermissionError:
                 tree["error"] = "Permission denied"
             except Exception as e:
@@ -272,7 +301,9 @@ class ResearchAgentProcessor(BaseProcessor):
 
         return build_tree(root_path)
 
-    def _init_workspace(self, code_input: ResearchAgentSandboxProcessorData, task_id: str) -> Path:
+    def _init_workspace(
+        self, code_input: ResearchAgentSandboxProcessorData, task_id: str
+    ) -> Path:
         cwd = Path(self.cwd)
 
         if code_input.workspace:
@@ -295,6 +326,7 @@ class ResearchAgentProcessor(BaseProcessor):
         code_input.logRunPath = (workspace / code_input.logRunPath).as_posix()
 
         import sandbox.common.research_agent as research_agent
+
         project_root = Path(research_agent.__file__).resolve().parent
         claude_src = project_root / ".claude"
         mcp_src = project_root / ".mcp.json"
@@ -309,7 +341,9 @@ class ResearchAgentProcessor(BaseProcessor):
 
         return workspace
 
-    async def _run_research_bak(self, code_input: ResearchAgentSandboxProcessorData, task_id: str, topic: str):
+    async def _run_research_bak(
+        self, code_input: ResearchAgentSandboxProcessorData, task_id: str, topic: str
+    ):
         workspace = self._init_workspace(code_input, task_id)
 
         original_cwd = Path.cwd()
@@ -319,17 +353,26 @@ class ResearchAgentProcessor(BaseProcessor):
         log_summary_file = Path(code_input.logSummaryPath)
         log_run_file = Path(code_input.logRunPath)
 
+        client = None
         try:
             transcript_writer = SandboxTranscriptWriter(log_run_file)
 
             session_dir = log_detail_file.parent
             session_dir.mkdir(parents=True, exist_ok=True)
-            tracker = SubagentTracker(transcript_writer=transcript_writer, session_dir=session_dir)
+            tracker = SubagentTracker(
+                transcript_writer=transcript_writer, session_dir=session_dir
+            )
 
             lead_agent_prompt = self._resolve_prompt("lead_agent_qa.txt", "lead_agent")
-            researcher_prompt = self._resolve_prompt("researcher_SAAD-SOP.txt", "researcher")
-            data_analyst_prompt = self._resolve_prompt("data_analyst.txt", "data_analyst")
-            report_writer_prompt = self._resolve_prompt("report_writer.txt", "report_writer")
+            researcher_prompt = self._resolve_prompt(
+                "researcher_SAAD-SOP.txt", "researcher"
+            )
+            data_analyst_prompt = self._resolve_prompt(
+                "data_analyst.txt", "data_analyst"
+            )
+            report_writer_prompt = self._resolve_prompt(
+                "report_writer.txt", "report_writer"
+            )
 
             agents = {
                 "researcher": AgentDefinition(
@@ -340,9 +383,12 @@ class ResearchAgentProcessor(BaseProcessor):
                         "for later use by report writers. Ideal for complex research tasks "
                         "that require deep searching and cross-referencing."
                     ),
-                    tools=["Write", "mcp__data-analyst-mcp__vanna_chat_once", 
-                           "mcp__exa-search-mcp__get_code_context_exa",
-                           "mcp__exa-search-mcp__web_search_exa"],
+                    tools=[
+                        "Write",
+                        "mcp__data-analyst-mcp__vanna_chat_once",
+                        "mcp__exa-search-mcp__get_code_context_exa",
+                        "mcp__exa-search-mcp__web_search_exa",
+                    ],
                     prompt=researcher_prompt,
                     model="sonnet",
                 ),
@@ -357,7 +403,13 @@ class ResearchAgentProcessor(BaseProcessor):
                         "'links', the agent MUST download the corresponding files and store them locally for later "
                         "reference. Use this agent before the report-writer to add visual and data-driven insights."
                     ),
-                    tools=["Glob", "Read", "Bash", "Write", "mcp__data-analyst-mcp__vanna_chat_once"],
+                    tools=[
+                        "Glob",
+                        "Read",
+                        "Bash",
+                        "Write",
+                        "mcp__data-analyst-mcp__vanna_chat_once",
+                    ],
                     prompt=data_analyst_prompt,
                     model="sonnet",
                 ),
@@ -391,21 +443,18 @@ class ResearchAgentProcessor(BaseProcessor):
                 ],
             }
 
-            if ResearchAgentProcessor._options is None:
-                options = ClaudeAgentOptions(
-                    permission_mode="bypassPermissions",
-                    cwd=workspace.as_posix(),
-                    setting_sources=["project"],
-                    system_prompt=lead_agent_prompt,
-                    allowed_tools=["Task", "mcp__data-analyst-mcp__vanna_chat_once"],
-                    agents=agents,
-                    hooks=hooks,
-                    model="sonnet",
-                )
-            else:
-                options = ResearchAgentProcessor._options
+            options = ClaudeAgentOptions(
+                permission_mode="bypassPermissions",
+                cwd=workspace.as_posix(),
+                setting_sources=["project"],
+                system_prompt=lead_agent_prompt,
+                allowed_tools=["Task", "mcp__data-analyst-mcp__vanna_chat_once"],
+                agents=agents,
+                hooks=hooks,
+                model="sonnet",
+            )
 
-            client = await self._ensure_client(options)
+            client = await self._create_client(options)
 
             transcript_writer.write_to_file(f"\nYou: {topic}\n")
 
@@ -425,10 +474,15 @@ class ResearchAgentProcessor(BaseProcessor):
                             workspace=workspace,
                             code_input=code_input,
                             topic=topic,
-                            assistant_summary=transcript_writer.buffer
+                            assistant_summary=transcript_writer.buffer,
                         )
                         with log_summary_file.open("w", encoding="utf-8") as handle:
-                            json.dump(intermediate_summary, handle, ensure_ascii=False, indent=2)
+                            json.dump(
+                                intermediate_summary,
+                                handle,
+                                ensure_ascii=False,
+                                indent=2,
+                            )
 
             transcript_writer.write("\n")
             transcript_writer.write("\n\nGoodbye!\n")
@@ -448,7 +502,7 @@ class ResearchAgentProcessor(BaseProcessor):
                 workspace=workspace,
                 code_input=code_input,
                 topic=topic,
-                assistant_summary=transcript_writer.buffer
+                assistant_summary=transcript_writer.buffer,
             )
 
             with log_summary_file.open("w", encoding="utf-8") as handle:
@@ -458,17 +512,33 @@ class ResearchAgentProcessor(BaseProcessor):
             Path(result_path).parent.mkdir(parents=True, exist_ok=True)
 
             # result_payload uses the same structure as summary (without assistant_summary)
-            result_payload = {k: v for k, v in summary.items() if k != "assistant_summary"}
+            result_payload = {
+                k: v for k, v in summary.items() if k != "assistant_summary"
+            }
 
             with open(result_path, "w", encoding="utf-8") as handle:
                 json.dump(result_payload, handle, ensure_ascii=False, indent=2)
 
-            return result_path, code_input.logDetailPath, code_input.logSummaryPath, code_input.logRunPath
+            return (
+                result_path,
+                code_input.logDetailPath,
+                code_input.logSummaryPath,
+                code_input.logRunPath,
+            )
 
         finally:
             os.chdir(original_cwd)
+            logger.info("Restored original working directory")
+            if client is not None:
+                try:
+                    await client.__aexit__(None, None, None)
+                    logger.info("Claude SDK client closed successfully")
+                except Exception as e:
+                    logger.error(f"Error closing Claude SDK client: {e}", exc_info=e)
 
-    async def _run_research(self, code_input: ResearchAgentSandboxProcessorData, task_id: str, topic: str):
+    async def _run_research(
+        self, code_input: ResearchAgentSandboxProcessorData, task_id: str, topic: str
+    ):
         workspace = self._init_workspace(code_input, task_id)
 
         original_cwd = Path.cwd()
@@ -478,18 +548,27 @@ class ResearchAgentProcessor(BaseProcessor):
         log_summary_file = Path(code_input.logSummaryPath)
         log_run_file = Path(code_input.logRunPath)
 
+        client = None
         try:
             transcript_writer = SandboxTranscriptWriter(log_run_file)
 
             session_dir = log_detail_file.parent
             session_dir.mkdir(parents=True, exist_ok=True)
-            tracker = SubagentTracker(transcript_writer=transcript_writer, session_dir=session_dir)
+            tracker = SubagentTracker(
+                transcript_writer=transcript_writer, session_dir=session_dir
+            )
 
             lead_agent_prompt = self._resolve_prompt("lead_agent_qa.txt", "lead_agent")
-            researcher_prompt = self._resolve_prompt("researcher_SAAD-SOP.txt", "researcher")
-            data_analyst_prompt = self._resolve_prompt("data_analyst.txt", "data_analyst")
-            report_writer_prompt = self._resolve_prompt("report_writer.txt", "report_writer")
- 
+            researcher_prompt = self._resolve_prompt(
+                "researcher_SAAD-SOP.txt", "researcher"
+            )
+            data_analyst_prompt = self._resolve_prompt(
+                "data_analyst.txt", "data_analyst"
+            )
+            report_writer_prompt = self._resolve_prompt(
+                "report_writer.txt", "report_writer"
+            )
+
             hooks = {
                 "PreToolUse": [
                     HookMatcher(
@@ -505,26 +584,28 @@ class ResearchAgentProcessor(BaseProcessor):
                 ],
             }
 
-            if ResearchAgentProcessor._options is None:
-                options = ClaudeAgentOptions(
-                    permission_mode="bypassPermissions",
-                    cwd=workspace.as_posix(),
-                    setting_sources=["project"],
-                    system_prompt=researcher_prompt,
-                    allowed_tools=["Task", "mcp__data-analyst-mcp__vanna_chat_once",  
-                                   "mcp__exa-search-mcp__get_code_context_exa",
-                                    "mcp__exa-search-mcp__web_search_exa"],
-               
-                    tools=["Write", "mcp__data-analyst-mcp__vanna_chat_once", 
-                           "mcp__exa-search-mcp__get_code_context_exa",
-                           "mcp__exa-search-mcp__web_search_exa"],
-                    hooks=hooks,
-                    model="sonnet",
-                )
-            else:
-                options = ResearchAgentProcessor._options
+            options = ClaudeAgentOptions(
+                permission_mode="bypassPermissions",
+                cwd=workspace.as_posix(),
+                setting_sources=["project"],
+                system_prompt=researcher_prompt,
+                allowed_tools=[
+                    "Task",
+                    "mcp__data-analyst-mcp__vanna_chat_once",
+                    "mcp__exa-search-mcp__get_code_context_exa",
+                    "mcp__exa-search-mcp__web_search_exa",
+                ],
+                tools=[
+                    "Write",
+                    "mcp__data-analyst-mcp__vanna_chat_once",
+                    "mcp__exa-search-mcp__get_code_context_exa",
+                    "mcp__exa-search-mcp__web_search_exa",
+                ],
+                hooks=hooks,
+                model="sonnet",
+            )
 
-            client = await self._ensure_client(options)
+            client = await self._create_client(options)
 
             transcript_writer.write_to_file(f"\nYou: {topic}\n")
 
@@ -544,10 +625,15 @@ class ResearchAgentProcessor(BaseProcessor):
                             workspace=workspace,
                             code_input=code_input,
                             topic=topic,
-                            assistant_summary=transcript_writer.buffer
+                            assistant_summary=transcript_writer.buffer,
                         )
                         with log_summary_file.open("w", encoding="utf-8") as handle:
-                            json.dump(intermediate_summary, handle, ensure_ascii=False, indent=2)
+                            json.dump(
+                                intermediate_summary,
+                                handle,
+                                ensure_ascii=False,
+                                indent=2,
+                            )
 
             transcript_writer.write("\n")
             transcript_writer.write("\n\nGoodbye!\n")
@@ -567,7 +653,7 @@ class ResearchAgentProcessor(BaseProcessor):
                 workspace=workspace,
                 code_input=code_input,
                 topic=topic,
-                assistant_summary=transcript_writer.buffer
+                assistant_summary=transcript_writer.buffer,
             )
 
             with log_summary_file.open("w", encoding="utf-8") as handle:
@@ -577,12 +663,26 @@ class ResearchAgentProcessor(BaseProcessor):
             Path(result_path).parent.mkdir(parents=True, exist_ok=True)
 
             # result_payload uses the same structure as summary (without assistant_summary)
-            result_payload = {k: v for k, v in summary.items() if k != "assistant_summary"}
+            result_payload = {
+                k: v for k, v in summary.items() if k != "assistant_summary"
+            }
 
             with open(result_path, "w", encoding="utf-8") as handle:
                 json.dump(result_payload, handle, ensure_ascii=False, indent=2)
 
-            return result_path, code_input.logDetailPath, code_input.logSummaryPath, code_input.logRunPath
+            return (
+                result_path,
+                code_input.logDetailPath,
+                code_input.logSummaryPath,
+                code_input.logRunPath,
+            )
 
         finally:
             os.chdir(original_cwd)
+            logger.info("Restored original working directory")
+            if client is not None:
+                try:
+                    await client.__aexit__(None, None, None)
+                    logger.info("Claude SDK client closed successfully")
+                except Exception as e:
+                    logger.error(f"Error closing Claude SDK client: {e}", exc_info=e)
