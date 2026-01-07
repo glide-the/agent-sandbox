@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -301,6 +302,90 @@ class ResearchAgentProcessor(BaseProcessor):
 
         return build_tree(root_path)
 
+    def _process_research_notes_with_repomix(
+        self,
+        session_dir: Path,
+        transcript_writer: SandboxTranscriptWriter,
+        workspace: Path,
+    ):
+        research_notes_dir = session_dir / "files" / "research_notes"
+        if not research_notes_dir.exists():
+            return
+
+        files = (
+            list(research_notes_dir.iterdir()) if research_notes_dir.is_dir() else []
+        )
+        if not files:
+            return
+
+        transcript_writer.write_to_file("\n\n=== Research Notes Files ===\n")
+        large_files = []
+        for file in sorted(files):
+            if file.is_file():
+                size = file.stat().st_size
+                transcript_writer.write_to_file(f"- {file.name} ({size} bytes)\n")
+                if size > 1048576:
+                    large_files.append(file.name)
+
+        if large_files:
+            transcript_writer.write_to_file(
+                f"\nNote: The following files exceed 1MB and will be skipped by Repomix:\n"
+            )
+            for filename in large_files:
+                transcript_writer.write_to_file(f"  - {filename}\n")
+
+        try:
+            transcript_writer.write_to_file("\n=== Running Repomix ===\n")
+
+            config_path = workspace / ".repomix-tmp.json"
+            config_content = {
+                "input": {"maxFileSize": 1048576},
+                "ignore": {
+                    "customPatterns": [
+                        "**/*.jpg",
+                        "**/*.jpeg",
+                        "**/*.png",
+                        "**/*.gif",
+                        "**/*.bmp",
+                        "**/*.svg",
+                        "**/*.ico",
+                        "**/*.webp",
+                    ]
+                },
+            }
+            with config_path.open("w", encoding="utf-8") as f:
+                json.dump(config_content, f)
+
+            repomix_cmd = [
+                "npx",
+                "repomix@latest",
+                "--config",
+                str(config_path),
+                "--style",
+                "plain",
+                str(research_notes_dir),
+            ]
+
+            result = subprocess.run(
+                repomix_cmd,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+
+            if config_path.exists():
+                config_path.unlink()
+
+            if result.stdout:
+                transcript_writer.write_to_file(result.stdout)
+            if result.stderr:
+                transcript_writer.write_to_file(f"Errors:\n{result.stderr}\n")
+
+        except subprocess.TimeoutExpired:
+            transcript_writer.write_to_file("Repomix command timed out.\n")
+        except Exception as e:
+            transcript_writer.write_to_file(f"Error running repomix: {e}\n")
+
     def _init_workspace(
         self, code_input: ResearchAgentSandboxProcessorData, task_id: str
     ) -> Path:
@@ -484,6 +569,10 @@ class ResearchAgentProcessor(BaseProcessor):
                                 indent=2,
                             )
 
+            self._process_research_notes_with_repomix(
+                session_dir, transcript_writer, workspace
+            )
+
             transcript_writer.write("\n")
             transcript_writer.write("\n\nGoodbye!\n")
 
@@ -634,6 +723,10 @@ class ResearchAgentProcessor(BaseProcessor):
                                 ensure_ascii=False,
                                 indent=2,
                             )
+
+            self._process_research_notes_with_repomix(
+                session_dir, transcript_writer, workspace
+            )
 
             transcript_writer.write("\n")
             transcript_writer.write("\n\nGoodbye!\n")
