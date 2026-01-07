@@ -309,7 +309,7 @@ class ResearchAgentProcessor(BaseProcessor):
 
         return workspace
 
-    async def _run_research(self, code_input: ResearchAgentSandboxProcessorData, task_id: str, topic: str):
+    async def _run_research_bak(self, code_input: ResearchAgentSandboxProcessorData, task_id: str, topic: str):
         workspace = self._init_workspace(code_input, task_id)
 
         original_cwd = Path.cwd()
@@ -399,6 +399,125 @@ class ResearchAgentProcessor(BaseProcessor):
                     system_prompt=lead_agent_prompt,
                     allowed_tools=["Task", "mcp__data-analyst-mcp__vanna_chat_once"],
                     agents=agents,
+                    hooks=hooks,
+                    model="sonnet",
+                )
+            else:
+                options = ResearchAgentProcessor._options
+
+            client = await self._ensure_client(options)
+
+            transcript_writer.write_to_file(f"\nYou: {topic}\n")
+
+            await client.query(prompt=topic)
+
+            transcript_writer.write("\nAgent: ", end="")
+
+            message_count = 0
+            async for msg in client.receive_response():
+                if type(msg).__name__ == "AssistantMessage":
+                    process_assistant_message(msg, tracker, transcript_writer)
+
+                    # Update directory_tree dynamically every 10 messages
+                    message_count += 1
+                    if message_count % 10 == 0:
+                        intermediate_summary = self._build_summary_structure(
+                            workspace=workspace,
+                            code_input=code_input,
+                            topic=topic,
+                            assistant_summary=transcript_writer.buffer
+                        )
+                        with log_summary_file.open("w", encoding="utf-8") as handle:
+                            json.dump(intermediate_summary, handle, ensure_ascii=False, indent=2)
+
+            transcript_writer.write("\n")
+            transcript_writer.write("\n\nGoodbye!\n")
+
+            transcript_writer.close()
+            tracker.close()
+
+            tool_log_default = session_dir / "tool_calls.jsonl"
+            if tool_log_default.exists():
+                if tool_log_default.resolve() != log_detail_file.resolve():
+                    if log_detail_file.exists():
+                        log_detail_file.unlink()
+                    tool_log_default.rename(log_detail_file)
+
+            # 使用通用方法构建 summary 结构
+            summary = self._build_summary_structure(
+                workspace=workspace,
+                code_input=code_input,
+                topic=topic,
+                assistant_summary=transcript_writer.buffer
+            )
+
+            with log_summary_file.open("w", encoding="utf-8") as handle:
+                json.dump(summary, handle, ensure_ascii=False, indent=2)
+
+            result_path = (log_summary_file.parent / "result.json").as_posix()
+            Path(result_path).parent.mkdir(parents=True, exist_ok=True)
+
+            # result_payload uses the same structure as summary (without assistant_summary)
+            result_payload = {k: v for k, v in summary.items() if k != "assistant_summary"}
+
+            with open(result_path, "w", encoding="utf-8") as handle:
+                json.dump(result_payload, handle, ensure_ascii=False, indent=2)
+
+            return result_path, code_input.logDetailPath, code_input.logSummaryPath, code_input.logRunPath
+
+        finally:
+            os.chdir(original_cwd)
+
+    async def _run_research(self, code_input: ResearchAgentSandboxProcessorData, task_id: str, topic: str):
+        workspace = self._init_workspace(code_input, task_id)
+
+        original_cwd = Path.cwd()
+        os.chdir(workspace)
+
+        log_detail_file = Path(code_input.logDetailPath)
+        log_summary_file = Path(code_input.logSummaryPath)
+        log_run_file = Path(code_input.logRunPath)
+
+        try:
+            transcript_writer = SandboxTranscriptWriter(log_run_file)
+
+            session_dir = log_detail_file.parent
+            session_dir.mkdir(parents=True, exist_ok=True)
+            tracker = SubagentTracker(transcript_writer=transcript_writer, session_dir=session_dir)
+
+            lead_agent_prompt = self._resolve_prompt("lead_agent_qa.txt", "lead_agent")
+            researcher_prompt = self._resolve_prompt("researcher_SAAD-SOP.txt", "researcher")
+            data_analyst_prompt = self._resolve_prompt("data_analyst.txt", "data_analyst")
+            report_writer_prompt = self._resolve_prompt("report_writer.txt", "report_writer")
+ 
+            hooks = {
+                "PreToolUse": [
+                    HookMatcher(
+                        matcher=None,
+                        hooks=[tracker.pre_tool_use_hook],
+                    )
+                ],
+                "PostToolUse": [
+                    HookMatcher(
+                        matcher=None,
+                        hooks=[tracker.post_tool_use_hook],
+                    )
+                ],
+            }
+
+            if ResearchAgentProcessor._options is None:
+                options = ClaudeAgentOptions(
+                    permission_mode="bypassPermissions",
+                    cwd=workspace.as_posix(),
+                    setting_sources=["project"],
+                    system_prompt=researcher_prompt,
+                    allowed_tools=["Task", "mcp__data-analyst-mcp__vanna_chat_once",  
+                                   "mcp__exa-search-mcp__get_code_context_exa",
+                                    "mcp__exa-search-mcp__web_search_exa"],
+               
+                    tools=["Write", "mcp__data-analyst-mcp__vanna_chat_once", 
+                           "mcp__exa-search-mcp__get_code_context_exa",
+                           "mcp__exa-search-mcp__web_search_exa"],
                     hooks=hooks,
                     model="sonnet",
                 )
