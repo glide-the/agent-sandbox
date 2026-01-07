@@ -357,6 +357,7 @@ class ResearchAgentProcessor(BaseProcessor):
                 capture_output=True,
                 text=True,
                 timeout=300,
+                env={**os.environ, "NODE_NO_WARNINGS": "1"},
             )
 
             if config_path.exists():

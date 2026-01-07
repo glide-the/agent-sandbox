@@ -8,9 +8,10 @@ RUN rm -rf /etc/apt/sources.list.d/* && \
     echo "deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free non-free-firmware" > /etc/apt/sources.list.d/security.list && \
     echo "deb http://mirrors.aliyun.com/debian bookworm-updates main contrib non-free non-free-firmware" > /etc/apt/sources.list.d/updates.list && \
     apt-get update
-RUN apt install -y vim
-RUN apt install -y curl
-RUN apt install -y procps
+RUN apt install -y vim curl procps gnupg
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
+    apt install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
 # 复制 sandbox 目录到 /app/sandbox
 ADD agent_sandbox-0.1.0-py3-none-any.whl /app/sandbox/agent_sandbox-0.1.0-py3-none-any.whl
