@@ -13,12 +13,11 @@ RUN apt install -y curl
 RUN apt install -y procps
 
 # 复制 sandbox 目录到 /app/sandbox
-ADD zhipuai_sandbox-0.1.0-py3-none-any.whl /app/sandbox/zhipuai_sandbox-0.1.0-py3-none-any.whl
+ADD agent_sandbox-0.1.0-py3-none-any.whl /app/sandbox/agent_sandbox-0.1.0-py3-none-any.whl
 ADD sandbox.yaml /app/sandbox/sandbox.yaml
 RUN ls /app/sandbox
 # 设置工作目录
-RUN pip install --no-cache-dir /app/sandbox/zhipuai_sandbox-0.1.0-py3-none-any.whl -i https://pypi.tuna.tsinghua.edu.cn/simple
-
+RUN pip install --no-cache-dir /app/sandbox/agent_sandbox-0.1.0-py3-none-any.whl -i https://pypi.tuna.tsinghua.edu.cn/simple
 CMD ["python", "-m","sandbox.start.start", "--speakers-config-file", "/app/sandbox/sandbox.yaml", "--verbose", "--mode", "web"]
 
 

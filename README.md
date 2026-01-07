@@ -160,6 +160,67 @@ python -m sandbox.start.main -m web_runner --nonce <your-nonce>
 - `--speakers-config-file`: 配置文件路径（默认: sandbox.yaml）
 - `--nonce`: 用于 Web 服务器间通信的安全令牌
 
+## Docker 部署
+
+### 打包应用
+
+使用 Poetry 打包项目：
+
+```bash
+poetry build
+```
+
+打包完成后会在 `dist/` 目录生成 `agent_sandbox-0.1.0-py3-none-any.whl` 文件。
+
+### 复制打包文件到 Docker 目录
+
+```bash
+cp dist/agent_sandbox-0.1.0-py3-none-any.whl docker/sandbox/
+cp sandbox.yaml docker/sandbox/
+```
+
+### 使用 Docker Compose
+
+项目提供了 Docker Compose 配置文件，可以快速部署服务：
+
+```bash
+cd docker
+docker-compose up -d
+```
+
+服务将在 `http://localhost:10000` 上运行。
+
+### 手动构建 Docker 镜像
+
+如果需要手动构建镜像：
+
+```bash
+cd docker/sandbox
+docker build -t sandbox-service:1.0.0 .
+```
+
+### 配置说明
+
+Docker 部署相关配置：
+- **端口**: 默认映射 10000 端口
+- **时区**: 默认设置为 Asia/Shanghai
+- **数据卷**: 映射本地 `agent-sandbox` 目录到容器 `/app/sandbox/agent-sandbox`
+
+环境变量可以在 `docker/docker-compose.yml` 中修改：
+
+```yaml
+environment:
+  - TZ="Asia/Shanghai"
+```
+
+### 镜像仓库
+
+镜像推送到私有仓库：
+```bash
+docker tag sandbox-service:1.0.0 10.50.104.66/agent-prod/sandbox-service:1.0.0
+docker push 10.50.104.66/agent-prod/sandbox-service:1.0.0
+```
+
 ## API 接口
 
 ### 提交任务
