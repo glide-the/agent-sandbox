@@ -37,7 +37,7 @@ def start_translator_client_proc(speakers_config_file: str, nonce: str = None):
         '--verbose'
     ]
 
-    proc = subprocess.Popen(cmds, cwd=f"{registry.get_path('library_root')}/../")
+    proc = subprocess.Popen(cmds, cwd=f"{registry.get_path('library_root')}")
     return proc
 
 
