@@ -707,7 +707,7 @@ class ResearchAgentProcessor(BaseProcessor):
                             )
 
             self._process_research_notes_with_repomix(
-                session_dir, transcript_writer, workspace
+                workspace, transcript_writer
             )
 
             transcript_writer.write("\n")
