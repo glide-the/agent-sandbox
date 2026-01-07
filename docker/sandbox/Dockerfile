@@ -19,8 +19,9 @@ RUN ls /app/sandbox
 # 设置工作目录
 RUN pip install --no-cache-dir /app/sandbox/agent_sandbox-0.1.0-py3-none-any.whl -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 创建非 root 用户
+# 创建非 root 用户并预创建 logs 目录
 RUN useradd -m -u 1000 -s /bin/bash sandbox && \
+    mkdir -p /app/logs && \
     chown -R sandbox:sandbox /app
 USER sandbox
 CMD ["python", "-m","sandbox.start.start", "--speakers-config-file", "/app/sandbox/sandbox.yaml", "--verbose", "--mode", "web"]
