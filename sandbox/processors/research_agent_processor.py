@@ -300,11 +300,10 @@ class ResearchAgentProcessor(BaseProcessor):
 
     def _process_research_notes_with_repomix(
         self,
-        session_dir: Path,
-        transcript_writer: SandboxTranscriptWriter,
         workspace: Path,
+        transcript_writer: SandboxTranscriptWriter,
     ):
-        research_notes_dir = session_dir / "files" / "research_notes"
+        research_notes_dir = workspace / "files" / "research_notes"
         if not research_notes_dir.exists():
             return
 
@@ -553,7 +552,7 @@ class ResearchAgentProcessor(BaseProcessor):
                             )
 
             self._process_research_notes_with_repomix(
-                session_dir, transcript_writer, workspace
+                workspace, transcript_writer
             )
 
             transcript_writer.write("\n")
