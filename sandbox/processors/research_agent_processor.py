@@ -322,7 +322,11 @@ class ResearchAgentProcessor(BaseProcessor):
             config_content = {
                 "input": {"maxFileSize": 1048576},
                 "ignore": {
+                    "useGitignore": False,
                     "customPatterns": [
+                        ".claude",
+                        ".mcp.json",
+                        "logs/**",
                         "**/*.jpg",
                         "**/*.jpeg",
                         "**/*.png",
@@ -331,7 +335,7 @@ class ResearchAgentProcessor(BaseProcessor):
                         "**/*.svg",
                         "**/*.ico",
                         "**/*.webp",
-                    ]
+                    ],
                 },
             }
             with config_path.open("w", encoding="utf-8") as f:
@@ -551,9 +555,7 @@ class ResearchAgentProcessor(BaseProcessor):
                                 indent=2,
                             )
 
-            self._process_research_notes_with_repomix(
-                workspace, transcript_writer
-            )
+            self._process_research_notes_with_repomix(workspace, transcript_writer)
 
             transcript_writer.write("\n")
             transcript_writer.write("\n\nGoodbye!\n")
@@ -706,9 +708,7 @@ class ResearchAgentProcessor(BaseProcessor):
                                 indent=2,
                             )
 
-            self._process_research_notes_with_repomix(
-                workspace, transcript_writer
-            )
+            self._process_research_notes_with_repomix(workspace, transcript_writer)
 
             transcript_writer.write("\n")
             transcript_writer.write("\n\nGoodbye!\n")
