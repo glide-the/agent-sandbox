@@ -144,7 +144,7 @@ class SubagentTracker:
         if self.transcript_writer and tool_input:
             detail = self._format_tool_input(tool_input)
             if detail:
-                self.transcript_writer.write_to_file(f"    Input: {detail}\n")
+                self.transcript_writer.write(f"    Input: {detail}\n")
 
     def _format_tool_input(self, tool_input: Dict[str, Any], max_length: int = 100) -> str:
         """Format tool input for human-readable logging."""

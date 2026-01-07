@@ -42,12 +42,6 @@ class TranscriptWriter:
         if flush:
             self.file.flush()
 
-    def write_to_file(self, text: str, flush: bool = True):
-        """Write text to transcript file only (not console)."""
-        self.file.write(text)
-        if flush:
-            self.file.flush()
-
     def close(self):
         """Close the transcript file."""
         self.file.close()

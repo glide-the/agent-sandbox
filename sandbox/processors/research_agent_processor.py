@@ -50,10 +50,6 @@ class SandboxTranscriptWriter(TranscriptWriter):
         self._buffer.append(text + end)
         super().write(text, end=end, flush=flush)
 
-    def write_to_file(self, text: str, end: str = "", flush: bool = True):
-        self._buffer.append(text + end)
-        super().write_to_file(text, flush=flush)
-
 
 @registry.register_processor("research_agent_processor")
 class ResearchAgentProcessor(BaseProcessor):
@@ -318,24 +314,10 @@ class ResearchAgentProcessor(BaseProcessor):
         if not files:
             return
 
-        transcript_writer.write_to_file("\n\n=== Research Notes Files ===\n")
-        large_files = []
-        for file in sorted(files):
-            if file.is_file():
-                size = file.stat().st_size
-                transcript_writer.write_to_file(f"- {file.name} ({size} bytes)\n")
-                if size > 1048576:
-                    large_files.append(file.name)
-
-        if large_files:
-            transcript_writer.write_to_file(
-                f"\nNote: The following files exceed 1MB and will be skipped by Repomix:\n"
-            )
-            for filename in large_files:
-                transcript_writer.write_to_file(f"  - {filename}\n")
+        transcript_writer.write("\n\n=== Research Notes Files ===\n")
 
         try:
-            transcript_writer.write_to_file("\n=== Running Repomix ===\n")
+            transcript_writer.write("\n=== Running Repomix ===\n")
 
             config_path = workspace / ".repomix-tmp.json"
             config_content = {
@@ -363,6 +345,7 @@ class ResearchAgentProcessor(BaseProcessor):
                 str(config_path),
                 "--style",
                 "plain",
+                "--stdout",
                 str(research_notes_dir),
             ]
 
@@ -377,14 +360,14 @@ class ResearchAgentProcessor(BaseProcessor):
                 config_path.unlink()
 
             if result.stdout:
-                transcript_writer.write_to_file(result.stdout)
+                transcript_writer.write(result.stdout)
             if result.stderr:
-                transcript_writer.write_to_file(f"Errors:\n{result.stderr}\n")
+                transcript_writer.write(f"Errors:\n{result.stderr}\n")
 
         except subprocess.TimeoutExpired:
-            transcript_writer.write_to_file("Repomix command timed out.\n")
+            transcript_writer.write("Repomix command timed out.\n")
         except Exception as e:
-            transcript_writer.write_to_file(f"Error running repomix: {e}\n")
+            transcript_writer.write(f"Error running repomix: {e}\n")
 
     def _init_workspace(
         self, code_input: ResearchAgentSandboxProcessorData, task_id: str
@@ -541,7 +524,7 @@ class ResearchAgentProcessor(BaseProcessor):
 
             client = await self._create_client(options)
 
-            transcript_writer.write_to_file(f"\nYou: {topic}\n")
+            transcript_writer.write(f"\nYou: {topic}\n")
 
             await client.query(prompt=topic)
 
@@ -696,7 +679,7 @@ class ResearchAgentProcessor(BaseProcessor):
 
             client = await self._create_client(options)
 
-            transcript_writer.write_to_file(f"\nYou: {topic}\n")
+            transcript_writer.write(f"\nYou: {topic}\n")
 
             await client.query(prompt=topic)
 
