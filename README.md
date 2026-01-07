@@ -185,7 +185,8 @@ cp sandbox.yaml docker/sandbox/
 
 ```bash
 cd docker
-docker-compose up -d --build
+docker-compose build --no-cache sandbox
+docker-compose up -d
 ```
 
 服务将在 `http://localhost:10000` 上运行。
