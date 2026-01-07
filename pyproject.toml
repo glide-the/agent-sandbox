@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "zhipuai-sandbox"
+name = "agent-sandbox"
 version = "0.1.0"
 description = ""
 readme = "README.md"
