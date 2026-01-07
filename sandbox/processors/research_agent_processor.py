@@ -327,7 +327,7 @@ class ResearchAgentProcessor(BaseProcessor):
 
         import sandbox.common.research_agent as research_agent
 
-        project_root = Path(research_agent.__file__).resolve().parent
+        project_root = Path(self.cwd)
         claude_src = project_root / ".claude"
         mcp_src = project_root / ".mcp.json"
 
