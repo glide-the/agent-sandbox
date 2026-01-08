@@ -535,24 +535,20 @@ class ResearchAgentProcessor(BaseProcessor):
             transcript_writer.write("\nAgent: ", end="")
 
             message_count = 0
-            processed_message_ids = set()
             total_input_tokens = 0
             total_output_tokens = 0
 
             async for msg in client.receive_response():
+                
+                if type(msg).__name__ == "ResultMessage":
+               
+                    usage = msg.usage
+                    total_input_tokens += usage['input_tokens'] 
+                    total_output_tokens += usage['output_tokens']
+                    
                 if type(msg).__name__ == "AssistantMessage":
                     process_assistant_message(msg, tracker, transcript_writer)
-
-                    # Track token usage (deduplicate by message ID)
-                    if hasattr(msg, 'usage') and hasattr(msg, 'id'):
-                        msg_id = msg.id
-                        if msg_id not in processed_message_ids:
-                            processed_message_ids.add(msg_id)
-                            usage = msg.usage
-                            if hasattr(usage, 'input_tokens'):
-                                total_input_tokens += usage.input_tokens
-                            if hasattr(usage, 'output_tokens'):
-                                total_output_tokens += usage.output_tokens
+ 
 
                     # Update directory_tree dynamically every 10 messages
                     message_count += 1
@@ -574,7 +570,7 @@ class ResearchAgentProcessor(BaseProcessor):
             # Write token usage to transcript
             self._process_research_notes_with_repomix(workspace, transcript_writer)
             transcript_writer.write("\n")
-            transcript_writer.write(f"\n📊 Token Usage: {len(processed_message_ids)} steps | Input: {total_input_tokens:,} | Output: {total_output_tokens:,} | Total: {total_input_tokens + total_output_tokens:,}\n")
+            transcript_writer.write(f"\n📊 Token Usage: Input: {total_input_tokens:,} | Output: {total_output_tokens:,} | Total: {total_input_tokens + total_output_tokens:,}\n")
             transcript_writer.write("\n\nGoodbye!\n")
 
             transcript_writer.close()
@@ -608,7 +604,7 @@ class ResearchAgentProcessor(BaseProcessor):
 
             # Add token usage to result payload
             result_payload["token_usage"] = {
-                "steps": len(processed_message_ids),
+                "steps": num_turns,
                 "input_tokens": total_input_tokens,
                 "output_tokens": total_output_tokens,
                 "total_tokens": total_input_tokens + total_output_tokens
@@ -712,24 +708,18 @@ class ResearchAgentProcessor(BaseProcessor):
             transcript_writer.write("\nAgent: ", end="")
 
             message_count = 0
-            processed_message_ids = set()
             total_input_tokens = 0
             total_output_tokens = 0
 
             async for msg in client.receive_response():
+                if type(msg).__name__ == "ResultMessage":
+               
+                    usage = msg.usage 
+                    total_input_tokens += usage['input_tokens'] 
+                    total_output_tokens += usage['output_tokens']
+                            
                 if type(msg).__name__ == "AssistantMessage":
                     process_assistant_message(msg, tracker, transcript_writer)
-
-                    # Track token usage (deduplicate by message ID)
-                    if hasattr(msg, 'usage') and hasattr(msg, 'id'):
-                        msg_id = msg.id
-                        if msg_id not in processed_message_ids:
-                            processed_message_ids.add(msg_id)
-                            usage = msg.usage
-                            if hasattr(usage, 'input_tokens'):
-                                total_input_tokens += usage.input_tokens
-                            if hasattr(usage, 'output_tokens'):
-                                total_output_tokens += usage.output_tokens
 
                     # Update directory_tree dynamically every 10 messages
                     message_count += 1
@@ -751,7 +741,7 @@ class ResearchAgentProcessor(BaseProcessor):
             # Write token usage to transcript
             self._process_research_notes_with_repomix(workspace, transcript_writer)
             transcript_writer.write("\n")
-            transcript_writer.write(f"\n📊 Token Usage: {len(processed_message_ids)} steps | Input: {total_input_tokens:,} | Output: {total_output_tokens:,} | Total: {total_input_tokens + total_output_tokens:,}\n")
+            transcript_writer.write(f"\n📊 Token Usage: Input: {total_input_tokens:,} | Output: {total_output_tokens:,} | Total: {total_input_tokens + total_output_tokens:,}\n")
             transcript_writer.write("\n\nGoodbye!\n")
 
             transcript_writer.close()
@@ -785,7 +775,7 @@ class ResearchAgentProcessor(BaseProcessor):
 
             # Add token usage to result payload
             result_payload["token_usage"] = {
-                "steps": len(processed_message_ids),
+                "steps": 1,    
                 "input_tokens": total_input_tokens,
                 "output_tokens": total_output_tokens,
                 "total_tokens": total_input_tokens + total_output_tokens
