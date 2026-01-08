@@ -468,6 +468,29 @@ interface RunnerState {
 }
 ```
 
+### TokenUsage
+
+```typescript
+interface TokenUsage {
+  steps: number;          // 对话步骤数（唯一消息ID数量）
+  input_tokens: number;   // 输入token总数
+  output_tokens: number;  // 输出token总数
+  total_tokens: number;   // 总token数（input + output）
+}
+```
+
+### ResearchAgentResult
+
+```typescript
+interface ResearchAgentResult {
+  workspace: string;
+  userId: string;
+  topic: string;
+  token_usage: TokenUsage;
+  // ...其他可能的字段
+}
+```
+
 ---
 
 ## 5. 任务执行流程
@@ -542,8 +565,41 @@ workspace/
         ├── log_detail.jsonl   # 详细工具调用日志
         ├── log_summary.json   # 日志摘要
         ├── log_run.log        # 运行日志
-        └── result.json        # 任务结果元数据
+        └── result.json        # 任务结果元数据（含token使用统计）
 ```
+
+### result.json 数据结构
+
+任务完成后，`result.json` 文件包含任务的元数据和执行信息：
+
+```json
+{
+  "workspace": "workspace/user_123",
+  "userId": "user_123",
+  "topic": "研究主题",
+  "token_usage": {
+    "steps": 5,
+    "input_tokens": 12345,
+    "output_tokens": 23456,
+    "total_tokens": 35801
+  }
+}
+```
+
+#### token_usage 字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `steps` | number | 对话步骤数（唯一消息ID数量，遵循"Same ID = Same Usage"原则） |
+| `input_tokens` | number | 输入token总数（发送给Claude的token数） |
+| `output_tokens` | number | 输出token总数（Claude生成的token数） |
+| `total_tokens` | number | 总token数（input + output） |
+
+**Token跟踪实现说明**:
+- 基于 [Claude Agent SDK Cost Tracking](https://platform.claude.com/docs/en/agent-sdk/cost-tracking) 最佳实践
+- 使用消息ID去重机制，避免并行工具调用重复计算
+- 每个唯一消息ID只计数一次，确保准确的成本追踪
+- 日志文件 `log_run.log` 中也会记录格式化的token使用信息
 
 ---
 
@@ -619,4 +675,5 @@ workspace/
 
 ### 更新日志
 
+- 2025-01-08: 添加 `token_usage` 字段到 `result.json`，记录Claude SDK token使用情况
 - 2024-12-29: 初始版本，包含三个主要 API 端点的完整文档
