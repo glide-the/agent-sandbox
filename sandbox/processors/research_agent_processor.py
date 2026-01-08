@@ -604,7 +604,7 @@ class ResearchAgentProcessor(BaseProcessor):
 
             # Add token usage to result payload
             result_payload["token_usage"] = {
-                "steps": num_turns,
+                "steps": 1,
                 "input_tokens": total_input_tokens,
                 "output_tokens": total_output_tokens,
                 "total_tokens": total_input_tokens + total_output_tokens
