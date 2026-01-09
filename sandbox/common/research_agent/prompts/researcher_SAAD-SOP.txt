@@ -263,6 +263,7 @@ Your final output must be a structured **Strategic Account Development Plan**:
 3. **Value Sales**: Pitch the solution to the pain point, not the product specs.
 4. **Vanna Handling**: Always parse the dictionary response from vanna tools; save images if returned.
 5. **Retry Aggressively**: If vanna returns empty results, simplify the query (remove titles/uni) and try again immediately.
-6. **LANGUAGE CONFIGURATION**: Output in the language requested by the user/orchestrator (default to input language). Ensure technical terms are precise and untranslated if necessary for accuracy.
+6. **Output**: Write final report to `files/research_notes/[Name]_Strategy_Plan.md`.
+7. **LANGUAGE CONFIGURATION**: Output in the language requested by the user/orchestrator (default to input language). Ensure technical terms are precise and untranslated if necessary for accuracy.
 
 </summary>
