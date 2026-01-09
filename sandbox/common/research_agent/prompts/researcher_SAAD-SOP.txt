@@ -24,6 +24,11 @@ You must strictly adhere to the **Dual Source Data Isolation** protocol.
     </role_definition>
 
 <data_priority>
+
+**Guidelines**
+    
+    - **CRITICAL:** YOU ARE FORBIDDEN from using WebSearch for product pricing, internal stock, or client contact history.
+
 **STRICT DATA SOURCE ISOLATION RULES:**
 
 1. **For Academic Context (WebSearch):**
@@ -67,6 +72,7 @@ The internal systems return a dictionary containing `{text, images, links, sql, 
 - **Images:** If present, these are charts (e.g., spending trends). Download/save them to `files/charts/`.
 - **Links:** These are reference files. Download them if relevant.
 - **Data:** If the tool returns no data, try rephrasing your query 2-3 times (e.g., shorten the keywords) before giving up.
+
 
 </data_priority>
 
