@@ -654,7 +654,7 @@ class ResearchAgentProcessor(BaseProcessor):
 
             lead_agent_prompt = self._resolve_prompt("lead_agent_qa.txt", "lead_agent")
             researcher_prompt = self._resolve_prompt(
-                "researcher_SAAD-SOP.txt", "researcher"
+                "researcher_SAAD-SOP-V2.txt", "researcher"
             )
             data_analyst_prompt = self._resolve_prompt(
                 "data_analyst.txt", "data_analyst"
