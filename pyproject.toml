@@ -15,7 +15,7 @@ include = [
 
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = ">=3.10,<3.12"
 
 #torch = "2.0.1"
 #torchaudio = "2.0.2"
@@ -27,11 +27,12 @@ omegaconf = "2.0.6"
 pydantic = "~=2.5.0"
 openai = "~=1.75.0"
 
+
+claude-agent-sdk = "^0.1.0"
 # log
 colorama = ">=0.4.5"
 
 # server
-nest-asyncio = "1.5.6"
 fastapi = "==0.109.2"
 uvicorn = ">=0.27.0.post1"
 pandas = "~2.0.3"

@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import os
@@ -8,7 +7,6 @@ import time
 import anyio
 from anyio.streams.text import TextReceiveStream
 from contextlib import asynccontextmanager
-import nest_asyncio
 
 from sandbox.common.registry import registry
 from sandbox.processors import BaseProcessor, ProcessorData
@@ -53,22 +51,58 @@ class SandboxProcessorData(ProcessorData):
         return "Sandbox"
 
 
+class ResearchAgentSandboxProcessorData(ProcessorData):
+    """
+    research_agent_task 专用的输入结构：
+    只关注 workspace 和用户相关的目录 / 日志文件，不再包含 evaluatorDir/standardFileDir 等评测字段。
+
+    典型 input_param.json 结构示例：
+
+    {
+      "fileData": {
+        "workspace": "workspace/user_123",            # 可选，默认按 userId 生成
+        "userId": "user_123",
+
+        # 以下三个字段都是相对 workspace 的路径
+        "userFilesDir": "files",                      # 用户研究输出目录（research_notes/data/charts/reports 都在里面）
+        "userLogsDir": "logs",                        # 日志目录
+        "logDetailPath": "logs/log_detail.jsonl",
+        "logSummaryPath": "logs/log_summary.json",
+        "logRunPath": "logs/log_run.log"
+      }
+    }
+    """
+    workspace: str = ""
+    userId: str
+    userFilesDir: str = "files"
+    userLogsDir: str = "logs"
+    logDetailPath: str = "logs/log_detail.jsonl"
+    logSummaryPath: str = "logs/log_summary.json"
+    logRunPath: str = "logs/log_run.log"
+
+    @property
+    def type(self) -> str:
+        """
+        用于 Processor.match / preprocess_dict 里的 key 区分，
+        避免和原来的 SandboxProcessorData 冲突。
+        """
+        return "ResearchAgentSandbox"
+
+
 @registry.register_processor("sandbox_started_processor")
 class SandboxToVoice(BaseProcessor):
 
     def __init__(self, cwd: str):
         super().__init__()
         self.cwd = cwd
-        nest_asyncio.apply()
 
-    def __call__(
+    async def __call__(
             self,
             code_input: SandboxProcessorData
     ):
-
-        # 同步调用协程代码
-        result_path, log_detail_path, log_summary_path, log_run_path = asyncio.get_event_loop().run_until_complete(
-            self._call_sandbox_start(code_input=code_input))
+        result_path, log_detail_path, log_summary_path, log_run_path = await self._call_sandbox_start(
+            code_input=code_input
+        )
 
         return result_path, log_detail_path, log_summary_path, log_run_path
 
@@ -83,6 +117,28 @@ class SandboxToVoice(BaseProcessor):
 
     def match(self, data: ProcessorData):
         return "Sandbox" in data.type
+
+    def init_paths(self, code_input: SandboxProcessorData, task_id: str) -> dict:
+        cwd = self.cwd
+        code_input.evaluatorDir = (Path(cwd) / code_input.evaluatorDir).as_posix()
+        code_input.evaluatorPath = (Path(code_input.evaluatorDir) / code_input.evaluatorPath).as_posix()
+        code_input.standardFileDir = (Path(cwd) / code_input.standardFileDir).as_posix()
+        code_input.standardFilePath = (Path(code_input.standardFileDir) / code_input.standardFilePath).as_posix()
+        code_input.userFileDir = (Path(cwd) / code_input.userFileDir).as_posix()
+        code_input.userFilePath = (Path(code_input.userFileDir) / code_input.userFilePath).as_posix()
+        code_input.userImagesDir = (Path(code_input.userFileDir) / code_input.userImagesDir).as_posix()
+        code_input.logDetailPath = (Path(code_input.evaluatorDir) / code_input.logDetailPath).as_posix()
+        code_input.logSummaryPath = (Path(code_input.evaluatorDir) / code_input.logSummaryPath).as_posix()
+        code_input.logRunPath = (Path(code_input.evaluatorDir) / code_input.logRunPath).as_posix()
+
+        result_path = os.path.join(cwd, code_input.evaluatorDir, code_input.evaluatorPath)
+
+        return {
+            "result_path": result_path,
+            "log_detail_path": code_input.logDetailPath,
+            "log_summary_path": code_input.logSummaryPath,
+            "log_run_path": code_input.logRunPath,
+        }
 
     async def _call_sandbox_start(self, code_input: SandboxProcessorData):
         cwd = self.cwd

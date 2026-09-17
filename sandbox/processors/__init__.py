@@ -8,7 +8,8 @@ from typing import List
 
 from sandbox.common.registry import registry
 from sandbox.processors.base_processor import BaseProcessor, ProcessorData
-from sandbox.processors.sanbox_started import SandboxProcessorData
+from sandbox.processors.sanbox_started import ResearchAgentSandboxProcessorData, SandboxProcessorData
+from sandbox.processors.research_agent_processor import ResearchAgentProcessor  # noqa: F401
 from sandbox.processors.agent_sandbox import (
     AgentMem0Processor,
     AgentMem0ProcessorData,
@@ -22,6 +23,7 @@ __all__ = [
     "BaseProcessor",
     "ProcessorData",
     "SandboxProcessorData",
+    "ResearchAgentSandboxProcessorData",
     "AgentMem0Processor",
     "AgentMem0ProcessorData",
     "AgentWorkspaceL2Processor",

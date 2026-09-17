@@ -37,7 +37,7 @@ def start_translator_client_proc(speakers_config_file: str, nonce: str = None):
         '--verbose'
     ]
 
-    proc = subprocess.Popen(cmds, cwd=f"{registry.get_path('library_root')}/../")
+    proc = subprocess.Popen(cmds, cwd=f"{registry.get_path('library_root')}")
     return proc
 
 
@@ -91,6 +91,15 @@ async def dispatch(speakers_config_file: str, nonce: str = None):
                     state = runner.task_states[task_id]
                     state['info'] = 'error'
                     state['finished'] = True
+                    payload = runner.task_data.get(task_id)
+                    if payload:
+                        user_id = runner.extract_user_id(payload)
+                        if user_id:
+                            runner.update_user_task_index(
+                                user_id=user_id,
+                                task_id=task_id,
+                                finished=True,
+                            )
                 client_process = start_translator_client_proc(speakers_config_file=speakers_config_file, nonce=nonce)
 
             # Filter queued and finished tasks
@@ -109,7 +118,7 @@ async def dispatch(speakers_config_file: str, nonce: str = None):
                 elif WEB_CLIENT_TIMEOUT >= 0:
                     if tid not in runner.ongoing_tasks and not s['finished'] \
                             and (now - payload.requested_at) > WEB_CLIENT_TIMEOUT:
-                        logger.debug(f'REMOVING TASK，{tid}' )
+                        logger.info(f'REMOVING TASK，{tid}' )
                         to_del_task_ids.add(tid)
                         try:
                             runner.queue.remove(tid)
@@ -117,8 +126,17 @@ async def dispatch(speakers_config_file: str, nonce: str = None):
                             pass
 
             for tid in to_del_task_ids:
-                logger.debug(f'Removing task {tid} from queue')
+                logger.info(f'Removing task {tid} from queue')
                 # Remove task from queue
+                payload = runner.task_data.get(tid)
+                if payload:
+                    user_id = runner.extract_user_id(payload)
+                    if user_id:
+                        runner.update_user_task_index(
+                            user_id=user_id,
+                            task_id=tid,
+                            finished=True,
+                        )
                 del runner.task_states[tid]
                 del runner.task_data[tid]
 

@@ -86,13 +86,20 @@ class WebSpeaker(Speaker):
 
         self.remote_infos = remote_infos
         self.nonce = nonce
+        # 存储所有正在处理的任务 {key: {task_id: {"data": dict, "status": "processing"/"scheduled"}}}
         self._task_results = {}
+        self._completed_tasks = set()  # 记录已完成的任务ID，用于清理
 
     async def listen(self):
         """
         监听server端任务，注册任务监听器接收消息通知
+        (已修改为异步并发调度模式)
         """
         logger.info('Waiting for WebSpeaker tasks')
+
+        MAX_CONCURRENT_TASKS = 100
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
+        background_tasks = set()
 
         async def sync_state(task_id: str, runner_stat: str, state: str, finished: bool, result: dict):
             # wait for runner to be end first (bad solution?)
@@ -110,9 +117,9 @@ class WebSpeaker(Speaker):
                     # 处理每个runner的调度
                     for _key, _remote_info in self.remote_infos.items():
 
-                        if self._task_results.get(_key) is None or self._task_results.get(_key).get("task_id") is None:
+                        if self._task_results.get(_key) is None:
                             continue
-                        if task_id in self._task_results.get(_key).get("task_id"):
+                        if task_id in self._task_results.get(_key):
                             host = '127.0.0.1'
                             if not '0.0.0.0' in _remote_info.get("host"):
                                 host = _remote_info.get("host")
@@ -129,52 +136,99 @@ class WebSpeaker(Speaker):
                     else:
                         break
 
+            # 如果任务完成，标记为已完成
+            if finished:
+                self._completed_tasks.add(task_id)
+
         for key, task in tasks_cache.items():
             task.add_progress_hook(sync_state)
 
+        async def task_worker(t_id: str, p_load: PayLoad):
+            async with semaphore:
+                try:
+                    logger.info(f'Processing task {t_id} concurrently')
+                    await self.preparation_runner(task_id=t_id, payload=p_load)
+                except Exception as e:
+                    logger.error(f"Task {t_id} failed: {e}")
+                    logger.error(traceback.format_exc())
+
         while True:
-            self._task_results = self._get_task()
-
-            wait_flag = False
-
-            if not self._task_results:
-                wait_flag = True
-
-            logger.debug(f'Wait _task_results: {self._task_results}')
-            if wait_flag:
-                await asyncio.sleep(1)
+            if semaphore.locked():
+                await asyncio.sleep(0.1)
                 continue
 
-            # 处理每个runner的调度,如果有任何一个返回了任务，则执行调度
-            for key, remote_info in self.remote_infos.items():
-                # TODO 此处需要分布式调度，需要考虑重复调度的问题
-                if self._task_results.get(key) is None or self._task_results.get(key).get("task_id") is None:
-                    wait_flag = True
-                else:
-                    wait_flag = False
+            # 获取新任务（不覆盖已有任务）
+            new_tasks = self._get_task()
+
+            # 合并新任务到处理队列中
+            if new_tasks:
+                for key, task_info in new_tasks.items():
+                    # 只添加新任务，不覆盖正在处理的任务
+                    if task_info and task_info.get("task_id"):
+                        task_id = task_info.get("task_id")
+                        # 如果是新任务且未完成，添加到处理队列
+                        if task_id not in self._completed_tasks:
+                            # 初始化该key的任务字典（如果不存在）
+                            if key not in self._task_results:
+                                self._task_results[key] = {}
+
+                            # 检查任务是否已经在处理队列中
+                            if task_id not in self._task_results[key]:
+                                self._task_results[key][task_id] = {
+                                    "data": task_info.get("data"),
+                                    "status": "processing"
+                                }
+                                logger.info(f"Added new task {task_id} to processing queue for {key}")
+
+            # 清理已完成的任务
+            for key in list(self._task_results.keys()):
+                for task_id in list(self._task_results[key].keys()):
+                    if task_id in self._completed_tasks:
+                        logger.info(f"Removing completed task {task_id} from {key}")
+                        del self._task_results[key][task_id]
+                        self._completed_tasks.discard(task_id)
+                # 如果该key下没有任务了，删除整个key
+                if not self._task_results[key]:
+                    del self._task_results[key]
+
+            # 检查是否有有效任务需要处理
+            has_valid_task = False
+            for key, tasks_dict in self._task_results.items():
+                for task_id, task_info in tasks_dict.items():
+                    if task_info.get("status") == "processing":
+                        has_valid_task = True
+                        break
+                if has_valid_task:
                     break
 
-            if wait_flag:
+            if not has_valid_task:
                 await asyncio.sleep(1)
                 continue
 
-            # if self.verbose:
-            #     # Write log file
-            #     log_file = self._result_path('log.txt')
-            #     add_file_logger(log_file)
-
-            # TODO 调度任务应当从队列中获取，而不是从runner_bootstrap_web中获取
-            # 处理每个runner的调度
+            # 调度任务
             for key, remote_info in self.remote_infos.items():
-                logger.info(f'Processing task {self._task_results.get(key).get("task_id")}')
+                if key not in self._task_results:
+                    continue
 
-                await self.preparation_runner(task_id=self._task_results.get(key).get("task_id"),
-                                              payload=PayLoad.parse_obj(self._task_results.get(key).get("data")))
+                # 遍历该key下的所有任务
+                for task_id, task_info in list(self._task_results[key].items()):
+                    if task_info.get("status") != "processing":
+                        continue
 
-            # if self.verbose:
-            #     # Write log file
-            #     log_file = self._result_path('log.txt')
-            #     remove_file_logger(log_file)
+                    # 标记任务为已调度，避免重复调度
+                    self._task_results[key][task_id]["status"] = "scheduled"
+
+                    try:
+                        payload_obj = PayLoad.parse_obj(task_info.get("data"))
+                        task = asyncio.create_task(task_worker(task_id, payload_obj))
+                        background_tasks.add(task)
+                        task.add_done_callback(background_tasks.discard)
+                    except Exception as e:
+                        logger.error(f"Failed to schedule task {task_id}: {e}")
+                        # 调度失败，重置状态以便重试
+                        self._task_results[key][task_id]["status"] = "processing"
+
+            await asyncio.sleep(0.01)
 
     def _get_task(self):
         try:

@@ -1,0 +1,28 @@
+version: '3'
+services:
+
+  sandbox:
+    build: ./sandbox
+    image: 10.50.104.66/agent-prod/sandbox-service:1.0.0
+    ports:
+      - "10000:10000"
+    ulimits:
+      nproc: 65535
+    container_name: sandbox
+    hostname: sandbox
+    restart: "no"
+    volumes:
+      - ./sandbox/agent-sandbox:/app/sandbox/agent-sandbox:rw
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TZ="Asia/Shanghai"
+    extra_hosts:
+      - "mysql:10.52.154.156"
+      - "redis:10.52.154.156"
+    networks:
+      - my-network
+
+
+networks:
+  my-network:
+    driver: bridge
