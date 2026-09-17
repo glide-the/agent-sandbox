@@ -15,6 +15,15 @@ preprocess:
           #   researcher: "/app/research_agent/prompts/researcher_sql.txt"
           #   data_analyst: "/app/research_agent/prompts/data_analyst_sql.txt"
           #   report_writer: "/app/research_agent/prompts/report_writer.txt"
+    - agent_mem0_processor:
+          name: "agent_mem0_processor"
+          cwd: "/Users/dmeck/project/agent-sandbox/app/sandbox"
+    - agent_workspace_l2_processor:
+          name: "agent_workspace_l2_processor"
+          cwd: "/Users/dmeck/project/agent-sandbox/app/sandbox"
+    - agent_workspace_l3_processor:
+          name: "agent_workspace_l3_processor"
+          cwd: "/Users/dmeck/project/agent-sandbox/app/sandbox"
 
 tasks:
   - sandbox_eval_task:
@@ -29,6 +38,24 @@ tasks:
         - research_agent_processor:
             processor: "research_agent_processor"
             processor_name: "ResearchAgentSandbox"
+  - agent_mem0_task:
+      name: "agent_mem0_task"
+      preprocess:
+        - mem0:
+            processor: "agent_mem0_processor"
+            processor_name: "AgentMem0"
+  - agent_workspace_l2_task:
+      name: "agent_workspace_l2_task"
+      preprocess:
+        - l2:
+            processor: "agent_workspace_l2_processor"
+            processor_name: "AgentWorkspaceL2"
+  - agent_workspace_l3_task:
+      name: "agent_workspace_l3_task"
+      preprocess:
+        - l3:
+            processor: "agent_workspace_l3_processor"
+            processor_name: "AgentWorkspaceL3"
 
 
 bootstrap:
