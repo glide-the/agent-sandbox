@@ -27,6 +27,21 @@ _principal: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 )
 
 
+class ExactMCPPathMiddleware:
+    """Route the configured MCP path internally without a protocol-breaking 307."""
+
+    def __init__(self, app, path: str):
+        self.app = app
+        self.path = path.rstrip("/")
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope.get("path") == self.path:
+            scope = dict(scope)
+            scope["path"] = f"{self.path}/"
+            scope["raw_path"] = scope["path"].encode("utf-8")
+        await self.app(scope, receive, send)
+
+
 def _response_dict(response: Any) -> dict:
     if hasattr(response, "model_dump"):
         return response.model_dump(mode="json")
