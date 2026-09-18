@@ -10,6 +10,8 @@ from sandbox.common.registry import registry
 from sandbox.processors.base_processor import BaseProcessor, ProcessorData
 from sandbox.processors.sanbox_started import ResearchAgentSandboxProcessorData, SandboxProcessorData
 from sandbox.processors.research_agent_processor import ResearchAgentProcessor  # noqa: F401
+from sandbox.processors.sheetsage2_processor import SheetSage2Processor
+from sandbox.processors.yue2_processor import YuE2Processor
 from sandbox.processors.agent_sandbox import (
     AgentMem0Processor,
     AgentMem0ProcessorData,
@@ -30,6 +32,8 @@ __all__ = [
     "AgentWorkspaceL2ProcessorData",
     "AgentWorkspaceL3Processor",
     "AgentWorkspaceL3ProcessorData",
+    "YuE2Processor",
+    "SheetSage2Processor",
     "get_processors",
     "load_preprocess",
 ]

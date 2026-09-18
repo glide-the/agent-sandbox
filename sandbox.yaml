@@ -24,6 +24,30 @@ preprocess:
     - agent_workspace_l3_processor:
           name: "agent_workspace_l3_processor"
           cwd: "/Users/dmeck/project/agent-sandbox/app/sandbox"
+    - yue2_processor:
+          name: "yue2_processor"
+          cwd: "/root/apps/YuE"
+          environment: "/root/yue-env"
+          task_root: "/root/agent-sandbox-data/tasks"
+          model_path: "/root/checkpoint/YuE2-3B"
+          vae_path: "/root/checkpoint/YuE2-Vae"
+          offline: true
+          device: "cuda"
+          memory_budget_gib: 24
+          timeout_seconds: 7200
+    - sheetsage2_processor:
+          name: "sheetsage2_processor"
+          cwd: "/root/apps/YuE"
+          environment: "/root/sheetsage2-env"
+          task_root: "/root/agent-sandbox-data/tasks"
+          model_path: "/root/checkpoint/SheetSage2"
+          base_model_path: "/root/checkpoint/MERT-v2-FullSong"
+          offline: true
+          device: "cuda"
+          dtype: "bf16"
+          preset: "default"
+          threads: 4
+          timeout_seconds: 7200
 
 tasks:
   - sandbox_eval_task:
@@ -56,6 +80,18 @@ tasks:
         - l3:
             processor: "agent_workspace_l3_processor"
             processor_name: "AgentWorkspaceL3"
+  - yue2_task:
+      name: "yue2_task"
+      preprocess:
+        - yue2:
+            processor: "yue2_processor"
+            processor_name: "YuE2"
+  - sheetsage2_task:
+      name: "sheetsage2_task"
+      preprocess:
+        - sheetsage2:
+            processor: "sheetsage2_processor"
+            processor_name: "SheetSage2"
 
 
 bootstrap:
@@ -63,6 +99,28 @@ bootstrap:
       name: "runner_bootstrap_web"
       host: "0.0.0.0"
       port: 10000
-      max_ongoing_tasks: 10
+      max_ongoing_tasks: 1
       web_client_timeout: 18000
       finished_task_remove_timeout: 10000
+      music:
+        data_root: "/root/agent-sandbox-data"
+        api_keys_file: "/root/agent-sandbox-data/secrets/music-api-keys.json"
+        auth_required: true
+        retention_seconds: 604800
+      upload:
+        data_root: "/root/agent-sandbox-data"
+        max_input_bytes: 268435456
+      mcp:
+        enabled: false
+        path: "/mcp"
+        transport: "streamable-http"
+        public_base_url: "https://runner.example.invalid"
+        tools:
+          - "runner_upload"
+          - "runner_submit"
+          - "runner_result"
+          - "runner_result_source"
+        upload_capability_path: "/api/uploads/{token}"
+        upload_ttl_seconds: 300
+        max_request_bytes: 1048576
+        inline_max_bytes: 262144

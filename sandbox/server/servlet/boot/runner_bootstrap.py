@@ -1,65 +1,189 @@
+import contextlib
+import copy
 import logging
 import threading
+import time
 
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import HTMLResponse
 
 from sandbox.common.registry import registry
 from sandbox.server.bootstrap.base import Bootstrap
 from sandbox.server.bootstrap.bootstrap_register import bootstrap_register
+from sandbox.server.mcp_api import create_runner_mcp
+from sandbox.server.model.flow_data import PayLoad
 from sandbox.server.model.result import BaseResponse
+from sandbox.server.music_auth import MusicAuth
+from sandbox.server.music_task_store import MusicTaskStore
+from sandbox.server.runner_assets import RunnerAssetStore
 from sandbox.server.servlet.document import document, page_index
 from sandbox.server.servlet.extract_file import (
     extract_standard_file,
-    extract_submit_file, extract_submit_mm_file,
+    extract_submit_file,
+    extract_submit_mm_file,
+    upload_runner_file,
 )
 from sandbox.server.servlet.logger_info import adjust_logging
 from sandbox.server.servlet.runner import (
+    _execution_profile,
+    get_bootstrap_info,
     get_task_async,
     post_task_update_async,
     result_async,
     result_source_async,
-    submit_async, get_bootstrap_info,
+    submit_async,
 )
 from sandbox.server.utils import MakeFastAPIOffline
+
 # 全局标识，标记 middleware 是否已执行过一次
 logging_adjusted = False
+
 
 @bootstrap_register.register_bootstrap("runner_bootstrap_web")
 class RunnerBootstrapBaseWeb(Bootstrap):
     """
     Bootstrap Server Lifecycle
     """
+
     app: FastAPI
     server_thread: threading
 
-    def __init__(self, host: str, port: int, max_ongoing_tasks: int | None = None):
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        max_ongoing_tasks: int | None = None,
+        music: dict | None = None,
+        upload: dict | None = None,
+        mcp: dict | None = None,
+    ):
         super().__init__()
 
         self.host = host
         self.port = port
         if max_ongoing_tasks:
             self._MAX_ONGOING_TASKS = max_ongoing_tasks
+        music = music or {}
+        upload = upload or {}
+        data_root = music.get("data_root") or upload.get("data_root")
+        self.music_auth = None
+        self.music_store = None
+        self.asset_store = None
+        self.mcp_config = dict(mcp or {})
+        self.mcp_integration = None
+        if data_root:
+            self.music_auth = MusicAuth(
+                music.get("api_keys_file"), music.get("auth_required", True)
+            )
+            self.music_store = MusicTaskStore(
+                data_root,
+                retention_seconds=music.get("retention_seconds", 604800),
+            )
+            self.asset_store = RunnerAssetStore(
+                data_root,
+                max_input_bytes=upload.get("max_input_bytes", 268435456),
+            )
+        if self.mcp_config.get("enabled") and (
+            self.music_auth is None or self.asset_store is None
+        ):
+            raise ValueError(
+                "MCP requires configured Runner authentication and uploads"
+            )
 
     @classmethod
     def from_config(cls, cfg=None):
         host = cfg.get("host")
         port = cfg.get("port")
         max_ongoing_tasks = cfg.get("max_ongoing_tasks", None)
-        return cls(host=host, port=port, max_ongoing_tasks=max_ongoing_tasks)
+        return cls(
+            host=host,
+            port=port,
+            max_ongoing_tasks=max_ongoing_tasks,
+            music=cfg.get("music"),
+            upload=cfg.get("upload"),
+            mcp=cfg.get("mcp"),
+        )
 
     async def run(self):
-        self.app = FastAPI(
-            title="API Server",
-            version=self.version
-        )
+        if self.music_store is not None:
+            self.music_store.prune()
+            for record in self.music_store.reconcile_startup():
+                state = record["state"]
+                if state.get("finished") or not record.get("public_payload"):
+                    continue
+                task_id = record["task_id"]
+                current_profile = _execution_profile(record["task_name"])
+                if current_profile != record["execution_profile_digest"]:
+                    state = {
+                        "task_id": task_id,
+                        "info": "interrupted",
+                        "finished": True,
+                        "result": {
+                            "stage": "interrupted",
+                            "outcome": "failed",
+                            "model_completed": False,
+                            "delivery_status": "failed",
+                            "artifacts": [],
+                            "error": {
+                                "kind": "execution_profile_changed",
+                                "message": (
+                                    "task binding changed; automatic execution "
+                                    "was refused"
+                                ),
+                            },
+                        },
+                    }
+                    self.music_store.update_state(task_id, state)
+                    continue
+                task_payload = copy.deepcopy(record["public_payload"])
+                task_payload["_service"] = {
+                    "task_id": task_id,
+                    "owner_id": record["owner_id"],
+                    "request_digest": record["request_digest"],
+                    "execution_profile_digest": record["execution_profile_digest"],
+                }
+                payload = PayLoad.model_validate(
+                    {
+                        "parameter": {
+                            "task_name": record["task_name"],
+                            "reset": False,
+                            "user_multi_task": False,
+                        },
+                        "payload": task_payload,
+                        "created_at": record["created_at"],
+                        "requested_at": time.time(),
+                    }
+                )
+                self.task_data[task_id] = payload
+                self.task_states[task_id] = state
+                self.queue.append(task_id)
+                self.update_user_task_index(record["owner_id"], task_id, False)
+        if self.mcp_config.get("enabled"):
+            self.mcp_integration = create_runner_mcp(
+                config=self.mcp_config,
+                auth=self.music_auth,
+                max_input_bytes=self.asset_store.max_input_bytes,
+            )
+
+        @contextlib.asynccontextmanager
+        async def lifespan(_app):
+            if self.mcp_integration is None:
+                yield
+                return
+            async with self.mcp_integration.server.session_manager.run():
+                yield
+
+        self.app = FastAPI(title="API Server", version=self.version, lifespan=lifespan)
         MakeFastAPIOffline(self.app)
-        self.app.mount("/static",
-                       StaticFiles(directory=f"{registry.get_path('server_library_root')}/static/static"),
-                       name="static")
+        self.app.mount(
+            "/static",
+            StaticFiles(
+                directory=f"{registry.get_path('server_library_root')}/static/static"
+            ),
+            name="static",
+        )
         # Add CORS middleware to allow all origins
         # 在config.py中设置OPEN_DOMAIN=True，允许跨域
         # set OPEN_DOMAIN=True in config.py to allow cross-domain
@@ -69,48 +193,79 @@ class RunnerBootstrapBaseWeb(Bootstrap):
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+            expose_headers=["Mcp-Session-Id"],
         )
 
-        self.app.get("/",
-                     response_model=BaseResponse,
-                     summary="演示首页")(page_index)
-        self.app.get("/docs",
-                     response_model=BaseResponse,
-                     summary="swagger 文档")(document)
-        self.app.post("/runner/submit",
-                      tags=["Runner"],
-                      summary="提交调度Runner")(submit_async)
-        self.app.get("/runner/task-internal",
-                     tags=["Runner"],
-                     summary="内部获取调度Runner")(get_task_async)
-        self.app.get("/runner/get_bootstrap_info",
-                     tags=["Runner"],
-                     summary="内部获取调度任务Runner信息")(get_bootstrap_info)
-        self.app.post("/runner/task-update-internal",
-                      tags=["Runner"],
-                      summary="内部同步调度RunnerStat")(post_task_update_async)
-        self.app.get("/runner/result_source",
-                     tags=["Runner"],
-                     summary="获取任务资源结果")(result_source_async)
-        self.app.get("/runner/result",
-                     tags=["Runner"],
-                     summary="获取任务结果")(result_async)
+        self.app.get("/", response_model=BaseResponse, summary="演示首页")(page_index)
+        self.app.get("/docs", response_model=BaseResponse, summary="swagger 文档")(
+            document
+        )
+        self.app.post("/runner/submit", tags=["Runner"], summary="提交调度Runner")(
+            submit_async
+        )
+        self.app.post("/runner/upload", tags=["Runner"], summary="上传Runner输入")(
+            upload_runner_file
+        )
+        self.app.get(
+            "/runner/task-internal", tags=["Runner"], summary="内部获取调度Runner"
+        )(get_task_async)
+        self.app.get(
+            "/runner/get_bootstrap_info",
+            tags=["Runner"],
+            summary="内部获取调度任务Runner信息",
+        )(get_bootstrap_info)
+        self.app.post(
+            "/runner/task-update-internal",
+            tags=["Runner"],
+            summary="内部同步调度RunnerStat",
+        )(post_task_update_async)
+        self.app.get(
+            "/runner/result_source", tags=["Runner"], summary="获取任务资源结果"
+        )(result_source_async)
+        self.app.get("/runner/result", tags=["Runner"], summary="获取任务结果")(
+            result_async
+        )
 
-        self.app.post("/extract_standard_file",
-                      tags=["ExtractFile"],
-                      summary="extract_standard_file")(extract_standard_file)
+        if self.mcp_integration is not None:
+            capability_path = str(
+                self.mcp_config.get("upload_capability_path", "/api/uploads/{token}")
+            )
 
-        self.app.post("/extract_submit_file",
-                      tags=["ExtractFile"],
-                      summary="extract_submit_file")(extract_submit_file)
+            async def receive_capability_upload(token: str, request: Request):
+                return await self.mcp_integration.capabilities.receive(
+                    token=token, request=request
+                )
 
-        self.app.post("/extract_submit_mm_file",
-                      tags=["ExtractFile"],
-                      summary="extract_submit_mm_file")(extract_submit_mm_file)
+            self.app.put(
+                capability_path,
+                tags=["Runner"],
+                summary="使用单次能力上传Runner输入",
+            )(receive_capability_upload)
+            self.app.mount(
+                self.mcp_integration.mount_path,
+                self.mcp_integration.app,
+                name="runner-mcp",
+            )
 
-        self.app.post("/logging/adjust",
-                      tags=["logging"],
-                      summary="更新日志级别")(adjust_logging)
+        self.app.post(
+            "/extract_standard_file",
+            tags=["ExtractFile"],
+            summary="extract_standard_file",
+        )(extract_standard_file)
+
+        self.app.post(
+            "/extract_submit_file", tags=["ExtractFile"], summary="extract_submit_file"
+        )(extract_submit_file)
+
+        self.app.post(
+            "/extract_submit_mm_file",
+            tags=["ExtractFile"],
+            summary="extract_submit_mm_file",
+        )(extract_submit_mm_file)
+
+        self.app.post("/logging/adjust", tags=["logging"], summary="更新日志级别")(
+            adjust_logging
+        )
         app = self.app
 
         # 中间件函数，用于设置特定路径的日志级别
