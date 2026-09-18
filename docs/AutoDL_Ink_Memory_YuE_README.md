@@ -14,12 +14,12 @@
 | Admin | `main` | [glide-the/dream-im-platform](https://github.com/glide-the/dream-im-platform/releases/tag/autodl-yue-2026.09.19) |
 | Python SDK | `main` | [glide-the/ink-claude-dream-agent-sdk-python](https://github.com/glide-the/ink-claude-dream-agent-sdk-python/releases/tag/autodl-yue-2026.09.19) |
 | Claude Runtime | `main` | [glide-the/ink-claude-code-dream](https://github.com/glide-the/ink-claude-code-dream/releases/tag/autodl-yue-2026.09.19) |
-| Agent Sandbox / YuE Runner | `main` | [glide-the/agent-sandbox](https://github.com/glide-the/agent-sandbox/releases/tag/autodl-yue-2026.09.19.1) |
+| Agent Sandbox / YuE Runner | `main` | [glide-the/agent-sandbox](https://github.com/glide-the/agent-sandbox/releases/tag/autodl-yue-2026.09.19.2) |
 | YuE2 Claude Skill | `main` | [glide-the/YuE2-skills](https://github.com/glide-the/YuE2-skills/releases/tag/autodl-yue-2026.09.19) |
 
 这是 GitHub 源码与镜像部署快照，不会替代各包管理器的版本：Python SDK 仍为 `0.2.145`，Claude Runtime 仍为 `0.1.10`；该协调标签不会重复发布 PyPI 或 npm 制品。镜像更新后仍应以 `/root/ink-autodl/admin/current`、`/root/ink-autodl/dream/current` 和健康检查结果确认实例实际采用的版本。
 
-Agent Sandbox 使用补丁标签 `autodl-yue-2026.09.19.1`；该补丁只把一键启动、Runner 启动和停止脚本的 Unix 可执行位纳入发布制品，不改变 Runner API、任务、配置或模型环境。
+Agent Sandbox 使用补丁标签 `autodl-yue-2026.09.19.2`；该补丁把一键启动、Runner 启动和停止脚本的 Unix 可执行位纳入发布制品，并让 Runner 主进程与 `web_runner` worker 使用同一个独立进程组，停止时完整回收；不改变 Runner API、任务、配置或模型环境。
 
 ## 快速开始
 
@@ -314,4 +314,4 @@ Runner 将模型任务并发限制为 1。只终止能够确认属于失败任�
 bash /root/autodl-tmp/agent-sandbox/deploy/autodl/stop_yue_runner.sh
 ```
 
-该脚本会核对 PID 和完整命令行，只停止本部署的 Runner，不影响 Admin 或 Dream。数据库与用户任务数据不会因服务停止而删除。
+该脚本会核对 PID 和完整命令行，并停止本部署的独立 Runner 进程组；旧版直系 `web_runner` worker 也会被一并回收。它不影响 Admin、Dream 或其他 Python 进程，数据库与用户任务数据不会因服务停止而删除。

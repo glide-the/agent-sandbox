@@ -3,6 +3,7 @@
 # [Output] One locally bound YuE Runner process plus a PID file and startup health receipt.
 # [Pos] AutoDL Runner launcher; model environments are persistent and separate from autodl-tmp.
 # [Sync] 2026-09-19: launch the relocated Runner environment from /root/yue-envs.
+# [Sync] 2026-09-19: isolate the Runner and its web worker in one process group for complete shutdown.
 set -euo pipefail
 
 APP_ROOT=/root/autodl-tmp/agent-sandbox
@@ -19,6 +20,13 @@ for path in "$APP_ROOT" "$RUNNER_PYTHON" "$CONFIG_FILE"; do
   fi
 done
 
+for command_name in curl nohup setsid ss; do
+  command -v "$command_name" >/dev/null 2>&1 || {
+    printf 'Missing required command: %s\n' "$command_name" >&2
+    exit 1
+  }
+done
+
 if ss -ltn | grep -q ':10000\b'; then
   printf 'Port 10000 is already listening; leaving the existing process unchanged.\n'
   exit 0
@@ -26,7 +34,7 @@ fi
 
 install -d -m 700 "$LOG_DIR"
 cd "$APP_ROOT"
-nohup env PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
+nohup setsid env PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
   "$RUNNER_PYTHON" -m sandbox.start.main \
   --mode web --speakers-config-file "$CONFIG_FILE" \
   >>"$LOG_FILE" 2>&1 &

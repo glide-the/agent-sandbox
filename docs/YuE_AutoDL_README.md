@@ -152,7 +152,7 @@ SheetSage2 在本镜像中使用 NumPy 1.26.4。官方依赖文件固定的 NumP
 bash /root/autodl-tmp/agent-sandbox/deploy/autodl/stop_yue_runner.sh
 ```
 
-停止脚本会先核对 PID 和命令行，只终止本部署的 Runner，不会按模糊进程名批量结束进程。
+停止脚本会先核对 PID 和命令行，再停止本部署的独立 Runner 进程组；旧版直系 `web_runner` worker 也会被一并回收。脚本不会按模糊进程名批量结束其他进程。
 
 ## 出现问题时怎么处理
 
