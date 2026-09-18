@@ -13,6 +13,12 @@ from sandbox.tasks.agent_sandbox_task import (
 )
 from sandbox.tasks.sheetsage2_task import SheetSage2FlowData, SheetSage2Task
 from sandbox.tasks.yue2_task import YuE2FlowData, YuE2Task
+from sandbox.tasks.music_utility_task import (
+    MusicListenFlowData,
+    MusicListenTask,
+    MusicScoreFlowData,
+    MusicScoreTask,
+)
 
 __all__ = [
     "BaseTask",
@@ -26,6 +32,10 @@ __all__ = [
     "YuE2Task",
     "SheetSage2FlowData",
     "SheetSage2Task",
+    "MusicScoreFlowData",
+    "MusicScoreTask",
+    "MusicListenFlowData",
+    "MusicListenTask",
     "Runner",
     "FlowData",
     "load_task",

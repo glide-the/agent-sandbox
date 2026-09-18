@@ -14,6 +14,8 @@ from sandbox.common.registry import registry
 from sandbox.server.bootstrap.bootstrap_register import get_bootstrap
 from sandbox.server.model.flow_data import PayLoad
 from sandbox.server.model.music import (
+    MusicListenSubmission,
+    MusicScoreSubmission,
     ResourceRef,
     SheetSage2Submission,
     YuE2Submission,
@@ -32,7 +34,12 @@ from sandbox.tasks import get_task
 from sandbox.tasks.exceptions import TaskRejectedError
 
 logger = logging.getLogger("server_runner")
-MUSIC_TASKS = {"yue2_task", "sheetsage2_task"}
+MUSIC_TASKS = {
+    "yue2_task",
+    "sheetsage2_task",
+    "music_score_task",
+    "music_listen_task",
+}
 
 
 def constant_compare(a, b):
@@ -94,6 +101,13 @@ def _iter_resource_refs(submission):
     if isinstance(submission, SheetSage2Submission):
         yield ResourceRef(asset_id=submission.audio_asset_id)
         return
+    if isinstance(submission, MusicListenSubmission):
+        return
+    if isinstance(submission, MusicScoreSubmission):
+        yield submission.check.source
+        if submission.check.after:
+            yield submission.check.after
+        return
     if submission.abc_source:
         yield submission.abc_source
     if submission.check:
@@ -133,6 +147,13 @@ def _validate_music_resources(bootstrap, owner_id: str, submission) -> None:
         source_state = bootstrap.music_store.recover_state(submission.source_task_id)
         if (source_state.get("result") or {}).get("delivery_status") != "ready":
             raise ValueError("decode source task is not ready")
+    if isinstance(submission, MusicListenSubmission):
+        for task_id in submission.source_task_ids:
+            record = bootstrap.music_store.read(task_id)
+            authorize_music_resource(record["owner_id"], owner_id)
+            source_state = bootstrap.music_store.recover_state(task_id)
+            if (source_state.get("result") or {}).get("delivery_status") != "ready":
+                raise ValueError(f"listening source task is not ready: {task_id}")
 
 
 def _public_music_state(state: dict) -> dict:

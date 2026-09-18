@@ -1,9 +1,12 @@
 # YuE2 / SheetSage2 任务服务
 
-本实现将两个模型运行链绑定为独立任务，不在 API 进程中导入 GPU 模型：
+本实现把官方 `yue2-music/scripts` 的四类能力全部绑定到 Runner
+Task/Processor，不在 API 进程或客户端 Skill 中执行脚本：
 
-- `yue2_task` → `yue2_processor` → `/root/yue-env`
-- `sheetsage2_task` → `sheetsage2_processor` → `/root/sheetsage2-env`
+- `yue2_task` → `yue2_processor` → `scripts/run_yue2.py`
+- `sheetsage2_task` → `sheetsage2_processor` → `scripts/transcribe.py`
+- `music_score_task` → `music_score_processor` → `scripts/abc_tools.py`
+- `music_listen_task` → `music_listen_processor` → `scripts/listen.py`
 
 部署配置位于 `sandbox.yaml`。YuE 代码固定放在 `/root/apps/YuE`，模型和 Hugging Face 缓存位于 `/root/checkpoint`，任务及上传文件位于 `/root/agent-sandbox-data`。Processor 只执行固定脚本和固定参数，客户端不能指定解释器、脚本、模型路径或服务器文件路径。
 
@@ -56,9 +59,17 @@ SDK 固定为 MCP Python SDK 1.x 维护线，以兼容设计规定的 2025-11-25
 - `plan`：生成可编辑计划。
 - `all_modes`：比较 full/melody/off；只接受文本请求。
 - `decode`：通过 `source_task_id` 重解码同用户完整原生结果。
-- `score_check`：执行 inspect、strip_chords 或 compare。
+- `score_check`：兼容旧客户端的乐谱检查入口。
 
 `sheetsage2_task` 仅支持 `transcribe`，输入字段为 `audio_asset_id`，转录模式为 `full`、`melody-full` 或 `melody-vocal`。
+
+`music_score_task` 专门执行 `score_check`，其中 `check.action` 为 `inspect`、
+`strip_chords` 或 `compare`。这是新 Skill 使用的入口；输入只能通过不可变
+`asset_id` 或同一主体已有任务的 `{task_id, result_source_name}` 引用。
+
+`music_listen_task` 执行 `listen`，接收 1–8 个已完成的 `source_task_ids`，在服务端
+生成 `index.html`、`manifest.json` 与可完整下载的 `comparison.zip` 比较包。Skill 只提交任务和下载产物，
+不会在客户端运行 `listen.py`。
 
 客户端不得发送 `_service`。该字段由 API 在鉴权、资源绑定和持久化任务 ID 创建之后注入；API 和 Worker 两次 `prepare` 必须得到同一个任务 ID。
 

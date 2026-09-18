@@ -2,7 +2,7 @@
 
 本镜像集成 **YuE2、SheetSage2、Agent Sandbox Runner 与 Runner MCP**。它可以把歌词和风格描述生成完整歌曲，也可以把已有音频转成可编辑的 ABC 乐谱，再用于翻唱或二次编曲。
 
-> Runner 启动后只提供任务队列、HTTP 与 MCP 接口，不会预先加载 YuE2，也不会占用模型显存。只有提交生成或转谱任务时，模型子进程才会启动。
+> Runner 启动后只提供任务队列、HTTP 与 MCP 接口，不会预先加载 YuE2，也不会占用模型显存。只有提交生成或转谱任务时，模型子进程才会启动；乐谱检查和试听比较是服务端轻量任务，不加载模型。
 
 ## 快速开始
 
@@ -49,7 +49,9 @@ HTTP / MCP 客户端
 Agent Sandbox Runner :10000
         │  持久任务、幂等、文件能力 URL
         ├──────────────► YuE2 子进程（Python 3.12）
-        └──────────────► SheetSage2 子进程（Python 3.11）
+        ├──────────────► SheetSage2 子进程（Python 3.11）
+        ├──────────────► ABC 检查任务（abc_tools.py）
+        └──────────────► 试听比较任务（listen.py）
                               │
                               ▼
                     ABC 乐谱可回传给 YuE2
@@ -76,13 +78,24 @@ Runner MCP 暴露以下静态工具：
 | 工具 | 用途 |
 | --- | --- |
 | `runner_upload` | 获取一次性上传能力 URL |
-| `runner_submit` | 提交 YuE2 或 SheetSage2 任务 |
+| `runner_submit` | 提交生成、转录、乐谱检查或试听比较任务 |
 | `runner_result` | 查询持久任务状态和结果清单 |
 | `runner_result_source` | 读取小文件或获取大文件下载 URL |
 
 客户端不需要配置 Token 或发送 `Authorization` 请求头。连接后可先执行只读检查：
 
 > 列出 Runner MCP 工具并报告服务状态，不要上传文件、提交任务或启动模型。
+
+四个 MCP 工具是统一传输接口，不等于只有四类模型调用。`runner_submit` 可提交：
+
+| Task | 服务端脚本 | 用途 |
+| --- | --- | --- |
+| `yue2_task` | `run_yue2.py` | 生成、规划、全模式与解码 |
+| `sheetsage2_task` | `transcribe.py` | 音频转 ABC |
+| `music_score_task` | `abc_tools.py` | inspect、strip_chords、compare |
+| `music_listen_task` | `listen.py` | 为已完成任务生成试听比较包 |
+
+Claude Skill 只负责上传、提交、轮询和下载，不能在客户端直接执行这些脚本或加载模型。
 
 ## 模型与软链接
 
