@@ -101,6 +101,7 @@ class ServiceMetadata(StrictModel):
     owner_id: str
     request_digest: str
     execution_profile_digest: str
+    resolved_resources: dict[str, str | list[str]] = Field(default_factory=dict)
 
 
 class SubmissionBase(StrictModel):

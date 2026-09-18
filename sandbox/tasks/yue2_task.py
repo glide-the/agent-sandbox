@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import inspect
-from typing import Dict
 
 from sandbox.common.registry import registry
 from sandbox.processors import get_processors
@@ -11,11 +10,7 @@ from sandbox.processors.yue2_processor import YuE2Processor
 from sandbox.server.model.flow_data import PayLoad
 from sandbox.server.model.music import YuE2Submission
 from sandbox.tasks.base_task import FlowData, Runner, SandboxTaskAbstract
-from sandbox.tasks.music_result import (
-    resolve_decode_source,
-    resolve_resource,
-    save_music_result,
-)
+from sandbox.tasks.music_result import save_music_result
 
 
 class YuE2FlowData(FlowData):
@@ -62,20 +57,7 @@ class YuE2Task(SandboxTaskAbstract):
             state="dispatch_yue2_task",
             result={"stage": "preparing"},
         )
-        resources: Dict[str, str] = {}
-        owner = submission.service.owner_id
-        if submission.abc_source:
-            resources["abc_source"] = resolve_resource(submission.abc_source, owner)
-        if submission.source_task_id:
-            resources["source_task"] = resolve_decode_source(
-                submission.source_task_id, owner
-            )
-        if submission.check:
-            resources["score_source"] = resolve_resource(submission.check.source, owner)
-            if submission.check.after:
-                resources["score_after"] = resolve_resource(
-                    submission.check.after, owner
-                )
+        resources = submission.service.resolved_resources
         result = self.processor(submission, runner.task_id, resources)
         if inspect.isawaitable(result):
             result = await result

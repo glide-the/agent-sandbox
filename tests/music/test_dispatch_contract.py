@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from pydantic import ValidationError
 
@@ -123,3 +125,36 @@ def test_utility_tasks_reject_each_others_operations():
     )
     with pytest.raises(ValidationError):
         MusicScoreTask.prepare(score)
+
+
+def test_worker_dispatch_uses_only_trusted_resource_handoff():
+    seen = {}
+
+    class StubProcessor:
+        async def __call__(self, submission, task_id, resources):
+            seen.update(resources)
+            return {"outcome": "complete", "delivery_status": "ready"}
+
+    task = MusicScoreTask(StubProcessor())
+
+    async def report_progress(**kwargs):
+        return None
+
+    task.report_progress = report_progress
+    value = payload(
+        "music_score_task",
+        {
+            "code_input": {"userId": "alice", "workflow_id": "wf"},
+            "operation": "score_check",
+            "check": {
+                "action": "inspect",
+                "source": {"asset_id": "asset_score"},
+            },
+        },
+    )
+    value.payload["_service"]["resolved_resources"] = {
+        "score_source": "/trusted/assets/score.abc"
+    }
+    runner = MusicScoreTask.prepare(value)
+    asyncio.run(task.dispatch(runner))
+    assert seen == {"score_source": "/trusted/assets/score.abc"}

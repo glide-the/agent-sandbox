@@ -1,6 +1,7 @@
 import hashlib
 import json
 from collections import deque
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -168,6 +169,9 @@ def test_http_accepts_server_side_score_and_listen_tasks(tmp_path):
         json=score_request,
     )
     assert score.status_code == 200
+    score_task_id = score.json()["data"]["task_id"]
+    handoff = bootstrap.task_data[score_task_id].payload["_service"]
+    assert Path(handoff["resolved_resources"]["score_source"]).is_file()
 
     generated = client.post(
         "/runner/submit",
@@ -178,6 +182,9 @@ def test_http_accepts_server_side_score_and_listen_tasks(tmp_path):
     source_state = bootstrap.music_store.recover_state(source_task_id)
     source_state["result"] = {"delivery_status": "ready", "artifacts": []}
     bootstrap.music_store.update_state(source_task_id, source_state)
+    (
+        bootstrap.music_store.task_dir(source_task_id) / "artifacts" / "native"
+    ).mkdir(parents=True)
     listen_request = {
         "parameter": {
             "task_name": "music_listen_task",

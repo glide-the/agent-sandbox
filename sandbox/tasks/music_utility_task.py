@@ -13,11 +13,7 @@ from sandbox.processors.music_utility_processor import (
 from sandbox.server.model.flow_data import PayLoad
 from sandbox.server.model.music import MusicListenSubmission, MusicScoreSubmission
 from sandbox.tasks.base_task import FlowData, Runner, SandboxTaskAbstract
-from sandbox.tasks.music_result import (
-    resolve_decode_source,
-    resolve_resource,
-    save_music_result,
-)
+from sandbox.tasks.music_result import save_music_result
 
 
 class MusicScoreFlowData(FlowData):
@@ -68,10 +64,7 @@ class MusicScoreTask(SandboxTaskAbstract):
             state="dispatch_music_score_task",
             result={"stage": "preparing"},
         )
-        owner = submission.service.owner_id
-        resources = {"score_source": resolve_resource(submission.check.source, owner)}
-        if submission.check.after:
-            resources["score_after"] = resolve_resource(submission.check.after, owner)
+        resources = submission.service.resolved_resources
         result = self.processor(submission, runner.task_id, resources)
         if inspect.isawaitable(result):
             result = await result
@@ -126,13 +119,7 @@ class MusicListenTask(SandboxTaskAbstract):
             state="dispatch_music_listen_task",
             result={"stage": "preparing"},
         )
-        owner = submission.service.owner_id
-        resources = {
-            "source_tasks": [
-                resolve_decode_source(task_id, owner)
-                for task_id in submission.source_task_ids
-            ]
-        }
+        resources = submission.service.resolved_resources
         result = self.processor(submission, runner.task_id, resources)
         if inspect.isawaitable(result):
             result = await result
