@@ -5,6 +5,10 @@ from collections import deque
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from sandbox.processors.music_utility_processor import (
+    MusicListenProcessor,
+    MusicScoreProcessor,
+)
 from sandbox.processors.sheetsage2_processor import SheetSage2Processor
 from sandbox.processors.yue2_processor import YuE2Processor
 from sandbox.server.bootstrap.bootstrap_register import bootstrap_cache
@@ -16,6 +20,7 @@ from sandbox.server.servlet.runner import (
     submit_async,
 )
 from sandbox.tasks import tasks_cache
+from sandbox.tasks.music_utility_task import MusicListenTask, MusicScoreTask
 from sandbox.tasks.sheetsage2_task import SheetSage2Task
 from sandbox.tasks.yue2_task import YuE2Task
 
@@ -58,6 +63,17 @@ def make_client(tmp_path):
     )
     tasks_cache["yue2_task"] = YuE2Task(yue)
     tasks_cache["sheetsage2_task"] = SheetSage2Task(sheet)
+    utility = {
+        "cwd": str(tmp_path),
+        "environment": str(tmp_path),
+        "task_root": str(tmp_path),
+    }
+    tasks_cache["music_score_task"] = MusicScoreTask(
+        MusicScoreProcessor(**utility)
+    )
+    tasks_cache["music_listen_task"] = MusicListenTask(
+        MusicListenProcessor(**utility)
+    )
 
     app = FastAPI()
     app.post("/runner/upload")(upload_runner_file)
@@ -120,6 +136,66 @@ def test_http_upload_submit_idempotency_and_read_only_get(tmp_path):
     status = client.get("/runner/result", headers=headers, params={"task_id": task_id})
     assert status.status_code == 200 and status.json()["data"]["finished"] is False
     assert task_file.read_bytes() == before
+
+
+def test_http_accepts_server_side_score_and_listen_tasks(tmp_path):
+    client, headers, bootstrap = make_client(tmp_path)
+    uploaded = client.post(
+        "/runner/upload",
+        headers=headers,
+        data={"user_id": "alice"},
+        files={"file": ("score.abc", b"X:1\nK:C\n", "text/vnd.abc")},
+    )
+    asset_id = uploaded.json()["data"]["asset_id"]
+    score_request = {
+        "parameter": {
+            "task_name": "music_score_task",
+            "reset": False,
+            "user_multi_task": False,
+        },
+        "payload": {
+            "code_input": {"userId": "alice", "workflow_id": "score"},
+            "operation": "score_check",
+            "check": {
+                "action": "inspect",
+                "source": {"asset_id": asset_id},
+            },
+        },
+    }
+    score = client.post(
+        "/runner/submit",
+        headers={**headers, "Idempotency-Key": "score-task"},
+        json=score_request,
+    )
+    assert score.status_code == 200
+
+    generated = client.post(
+        "/runner/submit",
+        headers={**headers, "Idempotency-Key": "source-task"},
+        json=generate_request(),
+    )
+    source_task_id = generated.json()["data"]["task_id"]
+    source_state = bootstrap.music_store.recover_state(source_task_id)
+    source_state["result"] = {"delivery_status": "ready", "artifacts": []}
+    bootstrap.music_store.update_state(source_task_id, source_state)
+    listen_request = {
+        "parameter": {
+            "task_name": "music_listen_task",
+            "reset": False,
+            "user_multi_task": False,
+        },
+        "payload": {
+            "code_input": {"userId": "alice", "workflow_id": "listen"},
+            "operation": "listen",
+            "source_task_ids": [source_task_id],
+        },
+    }
+    listen = client.post(
+        "/runner/submit",
+        headers={**headers, "Idempotency-Key": "listen-task"},
+        json=listen_request,
+    )
+    assert listen.status_code == 200
 
 
 def test_music_deployment_rejects_wrong_actor_and_non_music_task(tmp_path):

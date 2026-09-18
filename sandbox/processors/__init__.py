@@ -12,6 +12,10 @@ from sandbox.processors.sanbox_started import ResearchAgentSandboxProcessorData,
 from sandbox.processors.research_agent_processor import ResearchAgentProcessor  # noqa: F401
 from sandbox.processors.sheetsage2_processor import SheetSage2Processor
 from sandbox.processors.yue2_processor import YuE2Processor
+from sandbox.processors.music_utility_processor import (
+    MusicListenProcessor,
+    MusicScoreProcessor,
+)
 from sandbox.processors.agent_sandbox import (
     AgentMem0Processor,
     AgentMem0ProcessorData,
@@ -34,6 +38,8 @@ __all__ = [
     "AgentWorkspaceL3ProcessorData",
     "YuE2Processor",
     "SheetSage2Processor",
+    "MusicScoreProcessor",
+    "MusicListenProcessor",
     "get_processors",
     "load_preprocess",
 ]

@@ -70,3 +70,34 @@ def test_plan_matches_upstream_abc_and_cot_rules():
     value["request"]["cot"] = "off"
     with pytest.raises(ValidationError):
         parse_music_submission("yue2_task", value)
+
+
+def test_score_utility_task_has_a_strict_contract():
+    value = {
+        "code_input": {"userId": "alice", "workflow_id": "wf-score"},
+        "operation": "score_check",
+        "check": {
+            "action": "compare",
+            "source": {"asset_id": "asset_before"},
+            "after": {"asset_id": "asset_after"},
+            "voices": "Vocal",
+        },
+    }
+    parsed = parse_music_submission("music_score_task", value)
+    assert parsed.check.action == "compare"
+    value["check"].pop("after")
+    with pytest.raises(ValidationError):
+        parse_music_submission("music_score_task", value)
+
+
+def test_listen_utility_task_requires_unique_source_tasks():
+    value = {
+        "code_input": {"userId": "alice", "workflow_id": "wf-listen"},
+        "operation": "listen",
+        "source_task_ids": ["music_a", "music_b"],
+    }
+    parsed = parse_music_submission("music_listen_task", value)
+    assert parsed.source_task_ids == ["music_a", "music_b"]
+    value["source_task_ids"] = ["music_a", "music_a"]
+    with pytest.raises(ValidationError):
+        parse_music_submission("music_listen_task", value)

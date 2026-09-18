@@ -1,7 +1,7 @@
 preprocess:
   - yue2_processor:
       name: "yue2_processor"
-      cwd: "/root/apps/YuE"
+      cwd: "/root/apps/YuE/skills/yue2-music"
       environment: "/root/autodl-tmp/envs/yue-model"
       task_root: "/root/agent-sandbox-data/tasks"
       model_path: "/root/checkpoint/YuE2-3B"
@@ -12,7 +12,7 @@ preprocess:
       timeout_seconds: 7200
   - sheetsage2_processor:
       name: "sheetsage2_processor"
-      cwd: "/root/apps/YuE"
+      cwd: "/root/apps/YuE/skills/yue2-music"
       environment: "/root/autodl-tmp/envs/sheetsage2"
       task_root: "/root/agent-sandbox-data/tasks"
       model_path: "/root/checkpoint/SheetSage2"
@@ -23,6 +23,18 @@ preprocess:
       preset: "default"
       threads: 4
       timeout_seconds: 7200
+  - music_score_processor:
+      name: "music_score_processor"
+      cwd: "/root/apps/YuE/skills/yue2-music"
+      environment: "/root/autodl-tmp/envs/yue-runner"
+      task_root: "/root/agent-sandbox-data/tasks"
+      timeout_seconds: 300
+  - music_listen_processor:
+      name: "music_listen_processor"
+      cwd: "/root/apps/YuE/skills/yue2-music"
+      environment: "/root/autodl-tmp/envs/yue-runner"
+      task_root: "/root/agent-sandbox-data/tasks"
+      timeout_seconds: 300
 
 tasks:
   - yue2_task:
@@ -37,6 +49,18 @@ tasks:
         - sheetsage2:
             processor: "sheetsage2_processor"
             processor_name: "SheetSage2"
+  - music_score_task:
+      name: "music_score_task"
+      preprocess:
+        - score:
+            processor: "music_score_processor"
+            processor_name: "MusicScore"
+  - music_listen_task:
+      name: "music_listen_task"
+      preprocess:
+        - listen:
+            processor: "music_listen_processor"
+            processor_name: "MusicListen"
 
 bootstrap:
   - runner_bootstrap_web:

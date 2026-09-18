@@ -158,9 +158,29 @@ class SheetSage2Submission(SubmissionBase):
     transcription: TranscriptionOptions = Field(default_factory=TranscriptionOptions)
 
 
+class MusicScoreSubmission(SubmissionBase):
+    operation: Literal["score_check"]
+    check: ScoreCheckOptions
+
+
+class MusicListenSubmission(SubmissionBase):
+    operation: Literal["listen"]
+    source_task_ids: list[str] = Field(min_length=1, max_length=8)
+
+    @model_validator(mode="after")
+    def validate_sources(self):
+        if any(not task_id.strip() for task_id in self.source_task_ids):
+            raise ValueError("source task ids must not be empty")
+        if len(set(self.source_task_ids)) != len(self.source_task_ids):
+            raise ValueError("source task ids must be unique")
+        return self
+
+
 MUSIC_TASK_MODELS = {
     "yue2_task": YuE2Submission,
     "sheetsage2_task": SheetSage2Submission,
+    "music_score_task": MusicScoreSubmission,
+    "music_listen_task": MusicListenSubmission,
 }
 
 

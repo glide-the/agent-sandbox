@@ -105,7 +105,12 @@ async def dispatch(speakers_config_file: str, nonce: str = None):
                     for task_id in runner.ongoing_tasks
                     if runner.task_data.get(task_id)
                     and runner.task_data[task_id].parameter.task_name
-                    in {"yue2_task", "sheetsage2_task"}
+                    in {
+                        "yue2_task",
+                        "sheetsage2_task",
+                        "music_score_task",
+                        "music_listen_task",
+                    }
                 ]
                 if music_tasks:
                     logger.critical(
@@ -169,6 +174,8 @@ async def dispatch(speakers_config_file: str, nonce: str = None):
                 elif WEB_CLIENT_TIMEOUT >= 0 and payload.parameter.task_name not in {
                     "yue2_task",
                     "sheetsage2_task",
+                    "music_score_task",
+                    "music_listen_task",
                 }:
                     if (
                         tid not in runner.ongoing_tasks

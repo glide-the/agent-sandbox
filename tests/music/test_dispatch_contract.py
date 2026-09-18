@@ -1,9 +1,14 @@
 import pytest
 from pydantic import ValidationError
 
+from sandbox.processors.music_utility_processor import (
+    MusicListenProcessor,
+    MusicScoreProcessor,
+)
 from sandbox.processors.sheetsage2_processor import SheetSage2Processor
 from sandbox.processors.yue2_processor import YuE2Processor
 from sandbox.server.model.flow_data import PayLoad
+from sandbox.tasks.music_utility_task import MusicListenTask, MusicScoreTask
 from sandbox.tasks.sheetsage2_task import SheetSage2Task
 from sandbox.tasks.yue2_task import YuE2Task
 
@@ -80,3 +85,41 @@ def test_model_tasks_have_distinct_processor_types(tmp_path):
     )
     assert isinstance(YuE2Task(yue).processor, YuE2Processor)
     assert isinstance(SheetSage2Task(sheet).processor, SheetSage2Processor)
+
+
+def test_official_utility_scripts_have_distinct_task_processor_types(tmp_path):
+    common = {
+        "cwd": str(tmp_path),
+        "environment": str(tmp_path),
+        "task_root": str(tmp_path),
+    }
+    score = MusicScoreProcessor(**common)
+    listen = MusicListenProcessor(**common)
+    assert isinstance(MusicScoreTask(score).processor, MusicScoreProcessor)
+    assert isinstance(MusicListenTask(listen).processor, MusicListenProcessor)
+
+
+def test_utility_tasks_reject_each_others_operations():
+    listen = payload(
+        "music_listen_task",
+        {
+            "code_input": {"userId": "alice", "workflow_id": "wf"},
+            "operation": "score_check",
+            "check": {
+                "action": "inspect",
+                "source": {"asset_id": "asset_score"},
+            },
+        },
+    )
+    with pytest.raises(ValidationError):
+        MusicListenTask.prepare(listen)
+    score = payload(
+        "music_score_task",
+        {
+            "code_input": {"userId": "alice", "workflow_id": "wf"},
+            "operation": "listen",
+            "source_task_ids": ["music_source"],
+        },
+    )
+    with pytest.raises(ValidationError):
+        MusicScoreTask.prepare(score)

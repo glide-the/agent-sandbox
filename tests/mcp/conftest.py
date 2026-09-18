@@ -9,6 +9,10 @@ from fastapi import FastAPI, Request
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
+from sandbox.processors.music_utility_processor import (
+    MusicListenProcessor,
+    MusicScoreProcessor,
+)
 from sandbox.processors.sheetsage2_processor import SheetSage2Processor
 from sandbox.processors.yue2_processor import YuE2Processor
 from sandbox.server.bootstrap.bootstrap_register import bootstrap_cache
@@ -21,6 +25,7 @@ from sandbox.server.servlet.runner import (
     submit_async,
 )
 from sandbox.tasks import tasks_cache
+from sandbox.tasks.music_utility_task import MusicListenTask, MusicScoreTask
 from sandbox.tasks.sheetsage2_task import SheetSage2Task
 from sandbox.tasks.yue2_task import YuE2Task
 
@@ -67,6 +72,17 @@ def _build_runner_mcp(tmp_path, *, auth_required: bool):
     )
     tasks_cache["yue2_task"] = YuE2Task(yue)
     tasks_cache["sheetsage2_task"] = SheetSage2Task(sheet)
+    utility = {
+        "cwd": str(tmp_path),
+        "environment": str(tmp_path),
+        "task_root": str(tmp_path),
+    }
+    tasks_cache["music_score_task"] = MusicScoreTask(
+        MusicScoreProcessor(**utility)
+    )
+    tasks_cache["music_listen_task"] = MusicListenTask(
+        MusicListenProcessor(**utility)
+    )
 
     config = {
         "enabled": True,

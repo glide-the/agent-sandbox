@@ -30,6 +30,9 @@ PUBLIC_NAMES = {
     "invocation.json": "report",
     "inspection.json": "report",
     "compare.json": "report",
+    "index.html": "comparison",
+    "manifest.json": "comparison_manifest",
+    "comparison.zip": "comparison_bundle",
 }
 
 
@@ -64,7 +67,13 @@ def collect_music_artifacts(
     request_path = task_dir / "input" / "request.execution.json"
     if request_path.is_file():
         candidates.append(request_path)
-    for path in sorted(candidates):
+    for path in sorted(
+        candidates,
+        key=lambda candidate: (
+            candidate.parent != published_dir,
+            candidate.as_posix(),
+        ),
+    ):
         if not path.is_file() or path.is_symlink():
             continue
         base_name = PUBLIC_NAMES.get(path.name)
@@ -190,6 +199,13 @@ def verify_native_result(
                 "kind": "invalid_score",
                 "message": "transcription ABC is missing required headers",
             }
+    if operation == "listen" and not all(
+        (published_dir / name).is_file() for name in ("index.html", "manifest.json")
+    ):
+        return "failed", {
+            "kind": "missing_comparison",
+            "message": "listening comparison page or manifest is missing",
+        }
     return "complete", None
 
 
