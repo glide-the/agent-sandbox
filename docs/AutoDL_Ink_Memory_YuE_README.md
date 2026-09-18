@@ -4,6 +4,21 @@
 
 统一启动入口只启动已经发布的服务，不执行代码构建、数据库迁移、数据恢复、模型下载、权重加载或 GPU 检测。YuE2 和 SheetSage2 仅在收到对应任务后启动模型子进程。
 
+## 版本与发布
+
+本镜像使用协调部署标签 `autodl-yue-2026.09.19`。该标签把本说明中的一键启动、Admin 模型配置、YuE Runner 环境与模型软链接、Claude Skill 和使用示例固定到同一组源码快照：
+
+| 组件 | 默认分支 | GitHub Release |
+| --- | --- | --- |
+| Dream | `develop` | [glide-the/im-dream](https://github.com/glide-the/im-dream/releases/tag/autodl-yue-2026.09.19) |
+| Admin | `main` | [glide-the/dream-im-platform](https://github.com/glide-the/dream-im-platform/releases/tag/autodl-yue-2026.09.19) |
+| Python SDK | `main` | [glide-the/ink-claude-dream-agent-sdk-python](https://github.com/glide-the/ink-claude-dream-agent-sdk-python/releases/tag/autodl-yue-2026.09.19) |
+| Claude Runtime | `main` | [glide-the/ink-claude-code-dream](https://github.com/glide-the/ink-claude-code-dream/releases/tag/autodl-yue-2026.09.19) |
+| Agent Sandbox / YuE Runner | `main` | [glide-the/agent-sandbox](https://github.com/glide-the/agent-sandbox/releases/tag/autodl-yue-2026.09.19) |
+| YuE2 Claude Skill | `main` | [glide-the/YuE2-skills](https://github.com/glide-the/YuE2-skills/releases/tag/autodl-yue-2026.09.19) |
+
+这是 GitHub 源码与镜像部署快照，不会替代各包管理器的版本：Python SDK 仍为 `0.2.145`，Claude Runtime 仍为 `0.1.10`；该协调标签不会重复发布 PyPI 或 npm 制品。镜像更新后仍应以 `/root/ink-autodl/admin/current`、`/root/ink-autodl/dream/current` 和健康检查结果确认实例实际采用的版本。
+
 ## 快速开始
 
 ### 第一步：启动全部服务
