@@ -50,6 +50,90 @@ HTTP 或 MCP 上传输入、提交任务、轮询状态和下载产物；模型�
 文件交付说明见 [docs/music-service.md](docs/music-service.md)，AutoDL 使用说明见
 [docs/YuE_AutoDL_README.md](docs/YuE_AutoDL_README.md)。
 
+### 使用示例 1：根据风格和歌词生成歌曲
+
+安装 YuE2 Claude plugin 并连接 `http://127.0.0.1:11000/mcp` 后，可以直接对
+Claude 说：
+
+> 用 YuE2 生成一首 90 BPM 的中文女声爵士流行歌曲，包含钢琴、贝斯和轻柔鼓组；
+> 歌词主题是雨夜重逢。使用 full 模式，生成后把音频链接发给我。
+
+对应的核心 `runner_submit` 参数如下：
+
+```json
+{
+  "parameter": {
+    "task_name": "yue2_task",
+    "reset": false,
+    "user_multi_task": false
+  },
+  "payload": {
+    "code_input": {
+      "userId": "local",
+      "workflow_id": "rainy-night-jazz"
+    },
+    "operation": "generate",
+    "request": {
+      "id": "rainy-night-jazz-v1",
+      "style": "90 BPM Chinese female vocal jazz pop, piano, upright bass, soft drums",
+      "lyrics": "[Verse]\n雨落在旧街灯下……\n[Chorus]\n我们在雨夜重逢……",
+      "cot": "full",
+      "seed": 831001
+    }
+  },
+  "idempotency_key": "rainy-night-jazz-v1"
+}
+```
+
+保存返回的 `task_id`，只用 `runner_result` 轮询。完成后从 `artifacts` 读取真实的
+`result_source_name`，再调用 `runner_result_source`；音频等大文件使用 `mode: "link"`。
+超时重试同一意图时必须复用原 `idempotency_key`，不能重新提交一个新任务来查询进度。
+
+### 使用示例 2：上传音频并转录为 ABC 乐谱
+
+可以直接对 Claude 说：
+
+> 把 `/Users/me/Music/demo.wav` 上传到 YuE2 Runner，用 SheetSage2 的 full 模式
+> 转成 ABC 乐谱，完成后下载乐谱文件。
+
+首先调用 `runner_upload`：
+
+```json
+{
+  "file_path": "/Users/me/Music/demo.wav",
+  "client_os": "darwin"
+}
+```
+
+`runner_upload` 只签发一次性上传地址，不会读取或传输本地文件。客户端执行返回的
+`command`，成功的 PUT 响应会给出 `asset_id`。然后提交转录任务：
+
+```json
+{
+  "parameter": {
+    "task_name": "sheetsage2_task",
+    "reset": false,
+    "user_multi_task": false
+  },
+  "payload": {
+    "code_input": {
+      "userId": "local",
+      "workflow_id": "demo-transcription"
+    },
+    "operation": "transcribe",
+    "audio_asset_id": "<PUT 响应返回的 asset_id>",
+    "transcription": {
+      "task": "full"
+    }
+  },
+  "idempotency_key": "demo-transcription-v1"
+}
+```
+
+使用返回的 `task_id` 调用 `runner_result`。任务完成后，从结果清单取得 ABC 对应的
+`result_source_name`，再用 `runner_result_source` 的 `mode: "auto"` 读取或下载。
+不要猜测产物名称，也不要把本机路径、服务器路径或模型路径放进提交参数。
+
 ## 项目结构
 
 ```
