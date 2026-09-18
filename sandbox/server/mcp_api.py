@@ -122,6 +122,19 @@ def create_runner_mcp(
 ) -> RunnerMCPIntegration:
     public_base_url = str(config["public_base_url"])
     parsed = urlparse(public_base_url)
+    allowed_hosts = list(config.get("allowed_hosts") or [parsed.netloc])
+    allowed_origins = list(
+        config.get("allowed_origins") or [f"{parsed.scheme}://{parsed.netloc}"]
+    )
+    if not all(isinstance(value, str) and value for value in allowed_hosts):
+        raise ValueError("mcp.allowed_hosts must contain non-empty strings")
+    if parsed.netloc not in allowed_hosts:
+        raise ValueError("mcp.allowed_hosts must include the public base URL host")
+    public_origin = f"{parsed.scheme}://{parsed.netloc}"
+    if not all(isinstance(value, str) and value for value in allowed_origins):
+        raise ValueError("mcp.allowed_origins must contain non-empty strings")
+    if public_origin not in allowed_origins:
+        raise ValueError("mcp.allowed_origins must include the public base URL origin")
     mount_path = str(config.get("path", "/mcp"))
     if not mount_path.startswith("/") or mount_path == "/":
         raise ValueError("mcp.path must be a non-root absolute path")
@@ -164,8 +177,8 @@ def create_runner_mcp(
         max_request_body_size=max_request_bytes,
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=True,
-            allowed_hosts=[parsed.netloc],
-            allowed_origins=[f"{parsed.scheme}://{parsed.netloc}"],
+            allowed_hosts=allowed_hosts,
+            allowed_origins=allowed_origins,
         ),
     )
 
