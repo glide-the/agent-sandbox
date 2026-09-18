@@ -1,8 +1,12 @@
+## [Input] Relocatable YuE service environments and model/checkpoint paths on AutoDL.
+## [Output] Runner processor and task wiring for YuE2, SheetSage2, scoring, and listening.
+## [Pos] Production AutoDL Runner configuration; model environments live outside autodl-tmp.
+## [Sync] 2026-09-19: relocate persistent Conda environments to /root/yue-envs.
 preprocess:
   - yue2_processor:
       name: "yue2_processor"
       cwd: "/root/apps/YuE/skills/yue2-music"
-      environment: "/root/autodl-tmp/envs/yue-model"
+      environment: "/root/yue-envs/yue-model"
       task_root: "/root/agent-sandbox-data/tasks"
       model_path: "/root/checkpoint/YuE2-3B"
       vae_path: "/root/checkpoint/YuE2-Vae"
@@ -13,7 +17,7 @@ preprocess:
   - sheetsage2_processor:
       name: "sheetsage2_processor"
       cwd: "/root/apps/YuE/skills/yue2-music"
-      environment: "/root/autodl-tmp/envs/sheetsage2"
+      environment: "/root/yue-envs/sheetsage2"
       task_root: "/root/agent-sandbox-data/tasks"
       model_path: "/root/checkpoint/SheetSage2"
       base_model_path: "/root/checkpoint/MERT-v2-FullSong"
@@ -26,13 +30,13 @@ preprocess:
   - music_score_processor:
       name: "music_score_processor"
       cwd: "/root/apps/YuE/skills/yue2-music"
-      environment: "/root/autodl-tmp/envs/yue-runner"
+      environment: "/root/yue-envs/yue-runner"
       task_root: "/root/agent-sandbox-data/tasks"
       timeout_seconds: 300
   - music_listen_processor:
       name: "music_listen_processor"
       cwd: "/root/apps/YuE/skills/yue2-music"
-      environment: "/root/autodl-tmp/envs/yue-runner"
+      environment: "/root/yue-envs/yue-runner"
       task_root: "/root/agent-sandbox-data/tasks"
       timeout_seconds: 300
 

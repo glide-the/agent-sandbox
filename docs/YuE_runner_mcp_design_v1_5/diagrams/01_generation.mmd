@@ -1,0 +1,76 @@
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant SK as Claude plugin Skill
+    participant API as agent-sandbox API
+    participant TR as Task与Runner
+    participant P as YuE2Processor
+    participant Y as YuE2运行环境
+    participant F as 任务文件与结果记录
+
+    U->>SK: 提供风格、歌词与生成要求
+    SK->>SK: 按原Skill组织请求并保留请求键
+    opt 请求包含外部ABC文件
+        SK->>API: runner_upload(file_path, client_os)
+        API-->>SK: 一次性 PUT URL 与本地 curl 命令
+        SK->>API: 本地执行 curl，PUT /api/uploads/{token}
+        API->>F: 按user_id和asset_id隔离、校验并登记
+        API-->>SK: asset_id、sha256、size_bytes或上传错误
+    end
+    SK->>API: POST /runner/submit，yue2_task，operation=generate
+    API->>API: 校验身份、字段、输入资产和任务就绪条件
+    alt 参数或输入无效、环境未就绪
+        API-->>SK: 真实4xx或503，不创建采样任务
+        SK-->>U: 说明失败原因与所需修正
+    else 请求有效
+        API->>TR: 创建task_id并加入现有队列
+        API-->>SK: task_id、info=pending、finished=false
+        par 现有Runner执行
+            TR->>P: YuE2Task固定绑定yue2_processor
+            P->>F: 保存任务独立request.json，分配新输出目标
+            P->>P: environment解析为/root/yue-env/bin/python
+            P->>Y: 受控argv，generate --request绝对路径 --output新目录
+            Note over P,Y: cwd独立配置；权重从/root/checkpoint加载
+            Y-->>P: stdout、stderr与退出码
+            alt 执行异常、超时或取消
+                P->>Y: 终止并回收进程组
+                P->>F: 保存日志和错误记录
+                P-->>TR: info=error，finished=true
+            else 原生执行返回
+                P->>F: 检查音频、原生manifest、截断与乐谱检查结果
+                alt 文件缺失、损坏或登记失败
+                    P->>F: 保留已有原生结果与诊断
+                    P-->>TR: info=error，delivery_status=failed
+                else 可交付结果完成登记
+                    P->>F: 登记result_source_name与实际文件元数据
+                    P-->>TR: 完整结果快照，outcome=complete或needs_review
+                    TR->>API: 既有进度回报，info=end，finished=true
+                end
+            end
+        and 有限任务查询
+            loop 未终态且少于12次且累计等待小于60秒
+                SK->>API: GET /runner/result?task_id=...
+                API-->>SK: 真实状态与已就绪资源清单
+            end
+        end
+        alt 当前等待结束，任务仍未终态
+            SK-->>U: 返回task_id和真实阶段，下次查询同一任务
+        else 任务失败且无可取得结果
+            SK-->>U: 返回失败阶段，不修改参数自动重采样
+        else 清单包含可取得资源
+            SK->>API: GET /runner/result_source，task_id与result_source_name
+            API->>API: 校验主体及资源名称白名单
+            API->>F: 只读已登记文件
+            API-->>SK: 文件或明确读取错误
+            loop 临时传输失败且重试少于3次
+                SK->>API: 重取同一task_id和result_source_name
+                API-->>SK: 同一文件或错误
+            end
+            alt 下载及完整性校验通过
+                SK->>SK: 按原Skill检查结果、保留乐谱和请求、试听
+                SK-->>U: 音频、实际产物与真实警告
+            else 获取失败
+                SK-->>U: 保留任务标识并说明获取错误，不重新采样
+            end
+        end
+    end

@@ -1,0 +1,72 @@
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant SK as Claude plugin Skill
+    participant API as agent-sandbox API
+    participant TR as Task与Runner
+    participant P as YuE2Processor
+    participant Y as YuE2运行环境
+    participant F as 任务文件与结果记录
+
+    U->>SK: 指定原作品、修改内容与保留约束
+    SK->>API: GET /runner/result，source_task_id
+    API-->>SK: 原任务真实清单或权限错误
+    alt 缺少原谱或无权访问
+        SK-->>U: 说明需先取得可编辑乐谱，停止当前编辑步骤
+    else 来源可用
+        SK->>API: GET /runner/result_source，原谱、原请求、原音频资源名
+        API-->>SK: 已授权的原始产物
+        SK->>SK: 按原步骤保留基线、定义约束、另写修改稿
+        SK->>API: runner_upload(修改后ABC的file_path, client_os)
+        API-->>SK: 一次性 PUT URL 与本地 curl 命令
+        SK->>API: 本地 PUT /api/uploads/{token}
+        API-->>SK: 新asset_id、sha256、size_bytes或上传错误
+        SK->>API: POST /runner/submit，yue2_task，score_check
+        API->>TR: 校验后按原步骤运行inspect或compare
+        API-->>SK: check_task_id
+        TR->>P: 固定绑定yue2_processor
+        P->>Y: 目标解释器运行abc_tools.py，不加载GPU模型
+        Y->>F: 保存音乐事件检查报告
+        Y-->>P: 退出码和差异
+        P-->>TR: 登记检查结果
+        loop 未终态且少于12次且累计等待小于60秒
+            SK->>API: GET /runner/result，check_task_id
+            API-->>SK: 真实状态、检查结果与清单
+        end
+        alt 未完成或违反必须保留的约束
+            SK-->>U: 返回任务状态或差异，停止自动再生成
+        else 检查通过或已明确记录允许变化
+            SK->>API: POST /runner/submit，yue2_task，generate，新请求及abc_source
+            Note over SK,API: 引用修改稿，不覆盖原稿，不用旧latent冒充内容编辑
+            API->>TR: 创建新的生成任务
+            API-->>SK: new_task_id
+            TR->>P: YuE2Task固定绑定yue2_processor
+            P->>P: environment解析为/root/yue-env/bin/python
+            P->>Y: generate --request新请求 --abc-file修改稿 --output新目录
+            Y->>F: 保存新音频及原生结果
+            Y-->>P: stdout、stderr及退出码
+            alt 执行或文件检查失败
+                P->>Y: 按需终止并回收进程组
+                P-->>TR: info=error，保留原稿与诊断
+            else 输出可交付
+                P->>F: 登记新结果与来源关联
+                P-->>TR: info=end，outcome=complete或needs_review
+            end
+            loop 未终态且少于12次且累计等待小于60秒
+                SK->>API: GET /runner/result，new_task_id
+                API-->>SK: 真实状态与资源清单
+            end
+            alt 结果可取得
+                SK->>API: GET /runner/result_source，new_task_id与实际资源名
+                API-->>SK: 新音频、乐谱与报告或读取错误
+                loop 临时下载失败且重试少于3次
+                    SK->>API: 重取同任务同资源，不新建采样
+                    API-->>SK: 原有文件或错误
+                end
+                SK->>SK: 按原步骤对比完整歌曲和修改位置，保留每次尝试
+                SK-->>U: 两版结果、修改稿和检查说明，获取失败时明确报告
+            else 仍未完成或失败
+                SK-->>U: 返回task_id与真实状态，不自动重采样
+            end
+        end
+    end

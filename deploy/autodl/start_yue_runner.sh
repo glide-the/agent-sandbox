@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
+# [Input] Deployed Agent Sandbox source, /root/yue-envs/yue-runner, and the YuE Runner YAML.
+# [Output] One locally bound YuE Runner process plus a PID file and startup health receipt.
+# [Pos] AutoDL Runner launcher; model environments are persistent and separate from autodl-tmp.
+# [Sync] 2026-09-19: launch the relocated Runner environment from /root/yue-envs.
 set -euo pipefail
 
 APP_ROOT=/root/autodl-tmp/agent-sandbox
-RUNNER_PYTHON=/root/autodl-tmp/envs/yue-runner/bin/python
+RUNNER_PYTHON=/root/yue-envs/yue-runner/bin/python
 CONFIG_FILE="$APP_ROOT/deploy/autodl/sandbox.yue.yaml"
 LOG_DIR=/root/LaunchTool311/log
 LOG_FILE="$LOG_DIR/yue-runner.log"

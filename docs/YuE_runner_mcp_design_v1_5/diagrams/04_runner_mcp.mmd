@@ -1,0 +1,75 @@
+sequenceDiagram
+    autonumber
+    actor SK as Claude plugin Skill
+    participant MCP as agent-sandbox /mcp
+    participant R as Runner共用业务函数
+    participant T as 原Task与Runner
+    participant P as 原模型Processor
+    participant E as 对应模型环境
+    participant F as 原资产与任务资源存储
+    Note over MCP,R: MCP与保留的HTTP路由调用同一业务实现
+    SK->>MCP: tools/list
+    MCP-->>SK: runner_upload / runner_submit / runner_result / runner_result_source
+    opt 本次任务需要输入文件
+        SK->>MCP: runner_upload(file_path, client_os)
+        Note over MCP: 只校验路径元数据，不读取客户端文件
+        MCP-->>SK: 一次性、短效PUT URL与curl/curl.exe命令
+        SK->>MCP: 本地执行命令，PUT /api/uploads/{token}
+        MCP->>MCP: 消费token，有界写入owner-only临时文件
+        MCP->>R: upload_input(认证主体, 临时文件)
+        R->>R: 核对认证主体与资源归属
+        break 上传失败、文件无效或无权限
+            R-->>SK: 明确错误，不创建可用资产或模型任务
+        end
+        R->>F: 用户与asset_id隔离，完整写入并登记
+        R-->>SK: 同一资产库的asset_id / sha256 / size_bytes
+        Note over MCP,SK: PUT返回资产结果才算上传完成；旧URL不可重用
+    end
+    SK->>MCP: runner_submit(parameter, payload, idempotency_key)
+    MCP->>R: submit_task(同主体, 同请求键, 原报文)
+    alt 参数非法、越权或环境未就绪
+        R-->>MCP: 原业务错误，不入队
+        MCP-->>SK: isError=true与具体错误
+    else 请求通过或命中同一请求键
+        R->>T: 仅首次提交沿原队列创建任务
+        R-->>MCP: 原task_id与接受状态
+        MCP-->>SK: 结构化结果，不创建第二个任务ID
+        par 原任务机制独立执行
+            T->>P: 使用该Task原有固定绑定
+            P->>E: 对应environment解释器执行原模型命令
+            E-->>P: 输出文件、日志和退出码
+            P->>F: 校验实际产物并登记result_source_name
+            P-->>T: 既有状态与完整结果快照
+            T->>R: 原进度和终态更新
+        and 有限查询
+            loop 未终态且查询少于12次且等待小于60秒
+                SK->>MCP: runner_result(task_id)
+                MCP->>R: get_task_result(同主体, task_id)
+                R-->>MCP: 原状态与已就绪资源清单
+                MCP-->>SK: 查询成功；模型失败保留在任务状态中
+            end
+        end
+        alt 任务未完成或没有可读取产物
+            SK->>SK: 保留同一task_id，结束本次等待
+        else 资源就绪
+            SK->>MCP: runner_result_source(task_id, result_source_name, mode)
+            MCP->>R: open_task_resource(认证主体, 原资源标识)
+            R->>F: 授权后只读原文件
+            F-->>R: 文件描述、媒体类型、大小、SHA256
+            R-->>MCP: 已授权文件及元数据
+            alt 小文件且选择inline或auto
+                MCP-->>SK: Base64原字节，delivery=inline，bytes_included=true
+                SK->>SK: 解码、校验后保存；不变更文件格式
+            else 大文件或选择link
+                MCP-->>SK: 原result_source的resource_link，bytes_included=false
+                SK->>R: 授权GET /runner/result_source，原task_id和资源名
+                R-->>SK: 原文件流或明确错误
+                SK->>SK: 校验实际文件大小与SHA256
+            end
+            loop 临时下载失败且重试少于3次
+                SK->>R: 经相同工具或原HTTP路由重取同一资源
+                R-->>SK: 同一文件或明确错误，不重新采样
+            end
+        end
+    end
+    Note over MCP,F: /api/uploads/{token}是传输适配路由，不是第五个Runner业务接口

@@ -1,0 +1,87 @@
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant SK as Claude plugin Skill
+    participant API as agent-sandbox API
+    participant TR as Task与Runner
+    participant SP as SheetSage2Processor
+    participant SS as SheetSage2运行环境
+    participant YP as YuE2Processor
+    participant Y as YuE2运行环境
+    participant F as 任务文件与结果记录
+
+    U->>SK: 提供原音频、目标风格与歌词
+    SK->>API: runner_upload(file_path, client_os)
+    API-->>SK: 一次性 PUT URL 与本地 curl 命令
+    SK->>API: 本地执行 curl，PUT /api/uploads/{token}
+    API->>F: 用户与asset_id隔离、校验完整性后登记
+    alt 上传失败
+        API-->>SK: 上传错误，不接受后续资产引用
+        SK-->>U: 说明错误
+    else 上传完成
+        API-->>SK: asset_id、sha256、size_bytes
+        SK->>API: POST /runner/submit，sheetsage2_task，transcribe
+        API->>TR: 校验后入队
+        API-->>SK: transcription_task_id
+        TR->>SP: 固定绑定sheetsage2_processor
+        SP->>SS: /root/sheetsage2-env/bin/python transcribe.py
+        Note over SP,SS: 独立environment；音频绝对路径与全新output目录
+        SS->>F: 加载SheetSage2及其匹配父模型，写ABC与报告
+        SS-->>SP: 退出码、日志、原生结果
+        SP->>SP: 回收进程，释放本阶段GPU资源
+        SP-->>TR: 登记产物并报告end或error
+        loop 未终态且少于12次且累计等待小于60秒
+            SK->>API: GET /runner/result，transcription_task_id
+            API-->>SK: 状态、warnings及资源清单
+        end
+        alt 未终态或无可用ABC
+            SK-->>U: 返回当前状态或转录错误，停止后续生成
+        else ABC可用
+            SK->>API: GET /runner/result_source，task_id与score资源名
+            API-->>SK: 已授权原谱及所需报告
+            SK->>SK: 按原步骤检查、修正，保留原始转录
+            opt 乐谱发生修改
+                SK->>API: runner_upload(新ABC的file_path, client_os)
+                API-->>SK: 一次性 PUT URL 与本地 curl 命令
+                SK->>API: 本地 PUT /api/uploads/{token}
+                API-->>SK: 新asset_id与完整性信息
+            end
+            SK->>API: POST /runner/submit，yue2_task，score_check
+            API->>TR: 按原步骤执行inspect或strip_chords
+            API-->>SK: check_task_id
+            TR->>YP: abc_tools.py检查，无需加载GPU模型
+            YP->>F: 保存检查报告及实际生成的新谱
+            YP-->>TR: end或error与检查结果
+            loop 未终态且少于12次且累计等待小于60秒
+                SK->>API: GET /runner/result，check_task_id
+                API-->>SK: 实际检查结果与清单
+            end
+            alt 未完成或乐谱条件不合格
+                SK-->>U: 返回任务或检查差异，不进入生成
+            else 乐谱条件合格
+                SK->>API: POST /runner/submit，yue2_task，generate，cot=melody
+                Note over SK,API: abc_source引用最终检查或去和弦后的实际资源
+                API->>TR: 创建后续生成任务，不重跑转录
+                API-->>SK: generation_task_id
+                TR->>YP: 固定绑定yue2_processor
+                YP->>Y: /root/yue-env/bin/python run_yue2.py generate
+                Note over YP,Y: --request、--abc-file、--output为受控绝对路径
+                Y->>F: 生成音频及原生元数据
+                Y-->>YP: 退出码与日志
+                YP->>YP: 回收进程
+                YP-->>TR: 校验、登记并报告end或error
+                loop 未终态且少于12次且累计等待小于60秒
+                    SK->>API: GET /runner/result，generation_task_id
+                    API-->>SK: 真实状态与资源清单
+                end
+                alt 音频可取得
+                    SK->>API: GET /runner/result_source，task_id与音频资源名
+                    API-->>SK: 原有音频文件或明确读取错误
+                    SK->>SK: 按原步骤试听对比并保留来源记录
+                    SK-->>U: 新音频、乐谱及检查说明
+                else 仍在执行或失败
+                    SK-->>U: 返回真实状态，不重复提交采样
+                end
+            end
+        end
+    end

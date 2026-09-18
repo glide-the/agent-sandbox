@@ -48,7 +48,10 @@ HTTP 或 MCP 上传输入、提交任务、轮询状态和下载产物；模型�
 音乐部署示例位于
 [deploy/autodl/sandbox.yue.yaml](deploy/autodl/sandbox.yue.yaml)，完整接口、状态、恢复和
 文件交付说明见 [docs/music-service.md](docs/music-service.md)，AutoDL 使用说明见
-[docs/YuE_AutoDL_README.md](docs/YuE_AutoDL_README.md)。
+[docs/YuE_AutoDL_README.md](docs/YuE_AutoDL_README.md)。当 Runner 与 Ink & Memory
+Admin/Dream 部署在同一 AutoDL 实例时，使用
+[统一启动脚本](deploy/autodl/start_ink_memory_yue.sh)和
+[联合镜像说明](docs/AutoDL_Ink_Memory_YuE_README.md)。
 
 ### 配套 Claude Skill
 

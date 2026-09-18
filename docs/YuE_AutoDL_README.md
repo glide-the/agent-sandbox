@@ -49,7 +49,7 @@ HTTP / MCP 客户端
 Agent Sandbox Runner :10000
         │  持久任务、幂等、文件能力 URL
         ├──────────────► YuE2 子进程（Python 3.12）
-        ├──────────────► SheetSage2 子进程（Python 3.11）
+        ├──────────────► SheetSage2 子进程（Python 3.12）
         ├──────────────► ABC 检查任务（abc_tools.py）
         └──────────────► 试听比较任务（listen.py）
                               │
@@ -63,9 +63,9 @@ Runner 与两个模型环境相互隔离。任务并发数为 `1`，确保 YuE2 
 | --- | --- | --- |
 | Runner | `http://127.0.0.1:10000` | HTTP、上传、任务状态与结果 |
 | Runner MCP | `http://127.0.0.1:10000/mcp` | 4 个兼容工具 |
-| Runner 环境 | `/root/autodl-tmp/envs/yue-runner` | Conda Python 3.11 |
-| YuE2 环境 | `/root/autodl-tmp/envs/yue-model` | Conda Python 3.12 |
-| SheetSage2 环境 | `/root/autodl-tmp/envs/sheetsage2` | Conda Python 3.11 |
+| Runner 环境 | `/root/yue-envs/yue-runner` | Conda Python 3.11 |
+| YuE2 环境 | `/root/yue-envs/yue-model` | Conda Python 3.12 |
+| SheetSage2 环境 | `/root/yue-envs/sheetsage2` | Conda Python 3.12；PyTorch 2.8.0+cu128 |
 | YuE 源码 | `/root/apps/YuE` | 官方 YuE2 代码与本服务适配脚本 |
 | 服务源码 | `/root/autodl-tmp/agent-sandbox` | Agent Sandbox Runner |
 | 任务数据 | `/root/agent-sandbox-data/tasks` | 输入、日志、原生产物和交付产物 |
@@ -129,20 +129,22 @@ YuE2 生成不需要额外加载 MERT2；MERT2 只用于 SheetSage2。不要将�
 ## 环境验证（不启动模型）
 
 ```bash
-/root/autodl-tmp/envs/yue-runner/bin/python --version
-/root/autodl-tmp/envs/yue-model/bin/python --version
-/root/autodl-tmp/envs/sheetsage2/bin/python --version
+/root/yue-envs/yue-runner/bin/python --version
+/root/yue-envs/yue-model/bin/python --version
+/root/yue-envs/sheetsage2/bin/python --version
 
-/root/autodl-tmp/envs/yue-model/bin/python -c \
+/root/yue-envs/yue-model/bin/python -c \
   'import torch, yue2; print(torch.__version__, torch.cuda.is_available())'
 
-/root/autodl-tmp/envs/sheetsage2/bin/python -c \
+/root/yue-envs/sheetsage2/bin/python -c \
   'import torch, transformers; print(torch.__version__, torch.cuda.is_available())'
 
 nvidia-smi --query-gpu=name,memory.total,memory.used --format=csv,noheader
 ```
 
 导入检查不应创建 YuE2 模型进程，`nvidia-smi` 中也不应出现新增的大显存占用。
+
+SheetSage2 在本镜像中使用 NumPy 1.26.4。官方依赖文件固定的 NumPy 1.24.3 没有 Python 3.12 预编译包，因此镜像采用同一 1.x API 范围内的兼容版本，并在构建后执行 `pip check` 与 CUDA 导入检查。
 
 ## 停止 Runner
 
@@ -158,7 +160,7 @@ bash /root/autodl-tmp/agent-sandbox/deploy/autodl/stop_yue_runner.sh
 
 ```bash
 tail -n 200 /root/LaunchTool311/log/yue-runner.log
-test -x /root/autodl-tmp/envs/yue-runner/bin/python
+test -x /root/yue-envs/yue-runner/bin/python
 ```
 
 确认没有未知进程占用端口后，再重新运行启动脚本。
