@@ -53,6 +53,12 @@ def test_m11_rejects_untrusted_public_origin_and_tool_set():
         UploadCapabilityStore(public_base_url="file:///tmp/runner")
 
 
+def test_transport_allows_configured_ssh_tunnel_host(runner_mcp):
+    security = runner_mcp["integration"].server.settings.transport_security
+    assert "127.0.0.1:11000" in security.allowed_hosts
+    assert "http://127.0.0.1:11000" in security.allowed_origins
+
+
 def test_m04_expired_capability_cannot_be_reused():
     now = [100.0]
     store = UploadCapabilityStore(

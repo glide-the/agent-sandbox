@@ -72,6 +72,8 @@ def _build_runner_mcp(tmp_path, *, auth_required: bool):
         "enabled": True,
         "path": "/mcp",
         "public_base_url": "http://testserver",
+        "allowed_hosts": ["testserver", "127.0.0.1:11000"],
+        "allowed_origins": ["http://testserver", "http://127.0.0.1:11000"],
         "tools": [
             "runner_upload",
             "runner_submit",
