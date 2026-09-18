@@ -11,6 +11,8 @@ from sandbox.tasks.agent_sandbox_task import (
     AgentWorkspaceL2FlowData,
     AgentWorkspaceL3FlowData,
 )
+from sandbox.tasks.sheetsage2_task import SheetSage2FlowData, SheetSage2Task
+from sandbox.tasks.yue2_task import YuE2FlowData, YuE2Task
 
 __all__ = [
     "BaseTask",
@@ -20,6 +22,10 @@ __all__ = [
     "AgentMem0FlowData",
     "AgentWorkspaceL2FlowData",
     "AgentWorkspaceL3FlowData",
+    "YuE2FlowData",
+    "YuE2Task",
+    "SheetSage2FlowData",
+    "SheetSage2Task",
     "Runner",
     "FlowData",
     "load_task",

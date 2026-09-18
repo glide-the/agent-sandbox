@@ -1,21 +1,47 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import zipfile
 from datetime import datetime
-from typing import Any, Dict
+from typing import Dict
 
-from fastapi import UploadFile
+from fastapi import File, Form, HTTPException, Request, UploadFile, status
+
+from sandbox.server.bootstrap.bootstrap_register import get_bootstrap
+from sandbox.server.model.result import TaskRunnerResponse
+from sandbox.server.runner_service import upload_input
+
+
+async def upload_runner_file(
+    request: Request,
+    file: UploadFile = File(...),
+    user_id: str = Form(...),
+) -> TaskRunnerResponse:
+    """Store one immutable, owner-bound runner input without unpacking it."""
+    bootstrap = get_bootstrap("runner_bootstrap_web")
+    if bootstrap.asset_store is None or bootstrap.music_auth is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="runner uploads are not configured",
+        )
+    principal = bootstrap.music_auth.authenticate_request(request)
+    if principal != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="user_id does not match the authenticated principal",
+        )
+    return await upload_input(principal=principal, upload=file)
+
 
 cwd = "/app/sandbox"
 
+
 async def extract_standard_file(
-        file: UploadFile,
-        rank_id: str,
-        user_id: str,
+    file: UploadFile,
+    rank_id: str,
+    user_id: str,
 ) -> Dict:
     created_at = f"{rank_id}_{int(datetime.now().timestamp())}"
 
@@ -50,9 +76,9 @@ async def extract_standard_file(
 
 
 async def extract_submit_file(
-        file: UploadFile,
-        rank_id: str,
-        user_id: str,
+    file: UploadFile,
+    rank_id: str,
+    user_id: str,
 ) -> Dict:
     """
     提取评分文件到选手提交路径
@@ -85,9 +111,9 @@ async def extract_submit_file(
 
 
 async def extract_submit_mm_file(
-        file: UploadFile,
-        rank_id: str,
-        user_id: str,
+    file: UploadFile,
+    rank_id: str,
+    user_id: str,
 ) -> Dict:
     """
     提取多模态文件到指定路径
@@ -138,7 +164,4 @@ async def extract_submit_mm_file(
             purpose="submit",
         )
     except Exception as e:
-        return dict(
-            error=str(e)
-        )
-
+        return dict(error=str(e))
