@@ -82,7 +82,7 @@ def _authenticated_principal() -> str:
 
 
 class AuthenticatedMCPApp:
-    """Authenticate every MCP transport request and bind its principal."""
+    """Resolve and bind the configured principal for each MCP request."""
 
     def __init__(self, app, auth: MusicAuth):
         self.app = app
@@ -314,7 +314,7 @@ def create_runner_mcp(
                     "delivery": "link",
                     "bytes_included": False,
                     "url": url,
-                    "requires_auth": True,
+                    "requires_auth": auth.required,
                 }
             )
             link = ResourceLink(

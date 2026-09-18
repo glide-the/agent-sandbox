@@ -4,12 +4,11 @@ set -euo pipefail
 APP_ROOT=/root/autodl-tmp/agent-sandbox
 RUNNER_PYTHON=/root/autodl-tmp/envs/yue-runner/bin/python
 CONFIG_FILE="$APP_ROOT/deploy/autodl/sandbox.yue.yaml"
-SECRETS_FILE=/root/agent-sandbox-data/secrets/music-api-keys.json
 LOG_DIR=/root/LaunchTool311/log
 LOG_FILE="$LOG_DIR/yue-runner.log"
 PID_FILE=/root/LaunchTool311/yue-runner.pid
 
-for path in "$APP_ROOT" "$RUNNER_PYTHON" "$CONFIG_FILE" "$SECRETS_FILE"; do
+for path in "$APP_ROOT" "$RUNNER_PYTHON" "$CONFIG_FILE"; do
   if [[ ! -e "$path" ]]; then
     printf 'Missing required path: %s\n' "$path" >&2
     exit 1
@@ -31,7 +30,7 @@ pid=$!
 printf '%s\n' "$pid" >"$PID_FILE"
 
 for _ in $(seq 1 60); do
-  if curl -fsS http://127.0.0.1:10000/openapi.json >/dev/null; then
+  if curl -fsS http://127.0.0.1:10000/openapi.json >/dev/null 2>&1; then
     printf 'YuE Runner is ready (PID %s).\n' "$pid"
     exit 0
   fi

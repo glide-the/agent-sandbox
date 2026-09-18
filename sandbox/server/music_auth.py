@@ -1,4 +1,4 @@
-"""Bearer-token authentication for model task and runner asset routes."""
+"""Request-principal resolution for model task and runner asset routes."""
 
 from __future__ import annotations
 
@@ -12,9 +12,17 @@ from fastapi import HTTPException, Request, status
 
 
 class MusicAuth:
-    def __init__(self, api_keys_file: str | None, required: bool = True):
+    def __init__(
+        self,
+        api_keys_file: str | None,
+        required: bool = True,
+        anonymous_principal: str = "local",
+    ):
         self.api_keys_file = Path(api_keys_file).expanduser() if api_keys_file else None
         self.required = required
+        self.anonymous_principal = anonymous_principal.strip()
+        if not self.required and not self.anonymous_principal:
+            raise ValueError("anonymous principal must not be empty")
 
     def _principals(self) -> dict[str, str]:
         if self.api_keys_file is None or not self.api_keys_file.is_file():
@@ -44,6 +52,8 @@ class MusicAuth:
         return {str(digest): str(owner) for digest, owner in value.items()}
 
     def authenticate_header(self, authorization: str | None) -> str:
+        if not self.required:
+            return self.anonymous_principal
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

@@ -20,6 +20,12 @@ def test_auth_uses_token_digest_and_owner(tmp_path):
     assert error.value.status_code == 401
 
 
+def test_auth_disabled_uses_fixed_local_principal():
+    auth = MusicAuth(None, required=False, anonymous_principal="local")
+    assert auth.authenticate_header(None) == "local"
+    assert auth.authenticate_header("Bearer ignored") == "local"
+
+
 def test_idempotency_returns_same_task_and_conflicts_on_changed_request(tmp_path):
     store = MusicTaskStore(str(tmp_path))
     kwargs = dict(

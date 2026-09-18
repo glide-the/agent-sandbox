@@ -40,21 +40,11 @@ ssh -N -o ExitOnForwardFailure=yes \
 - Swagger：`http://127.0.0.1:11000/docs`
 - MCP：`http://127.0.0.1:11000/mcp`
 
-### 3. 配置访问 Token
-
-Token 只在服务端保存 SHA-256 摘要。查看部署时单独交付的明文 Token；不要把它提交到 Git、README 或聊天记录。
-
-HTTP 请求统一使用：
-
-```text
-Authorization: Bearer <你的Token>
-```
-
 ## 服务关系
 
 ```text
 HTTP / MCP 客户端
-        │  Bearer Token
+        │  SSH 隧道，无应用层 Token
         ▼
 Agent Sandbox Runner :10000
         │  持久任务、幂等、文件能力 URL
@@ -90,7 +80,7 @@ Runner MCP 暴露以下静态工具：
 | `runner_result` | 查询持久任务状态和结果清单 |
 | `runner_result_source` | 读取小文件或获取大文件下载 URL |
 
-客户端必须在每个 MCP HTTP 请求中发送 Bearer Token。完成连接后先执行只读检查：
+客户端不需要配置 Token 或发送 `Authorization` 请求头。连接后可先执行只读检查：
 
 > 列出 Runner MCP 工具并报告服务状态，不要上传文件、提交任务或启动模型。
 
@@ -156,17 +146,9 @@ bash /root/autodl-tmp/agent-sandbox/deploy/autodl/stop_yue_runner.sh
 ```bash
 tail -n 200 /root/LaunchTool311/log/yue-runner.log
 test -x /root/autodl-tmp/envs/yue-runner/bin/python
-test -r /root/agent-sandbox-data/secrets/music-api-keys.json
 ```
 
 确认没有未知进程占用端口后，再重新运行启动脚本。
-
-### 返回 `401` 或 `403`
-
-- `401`：缺少 Token、Token 无效，或没有使用 `Bearer` 格式；
-- `403`：请求中的 `code_input.userId` 与 Token 绑定用户不一致，或正在读取其他用户的资源。
-
-不要为了排障关闭生产认证。
 
 ### MCP 浏览器访问返回 `405` 或 `406`
 
@@ -201,8 +183,8 @@ ps -eo pid,cmd | grep -E '[Y]uE|[S]heetSage|[p]ython'
 ## 安全与许可
 
 - Runner 默认只监听本机，通过 SSH 隧道访问；
-- API Token 文件权限必须为 `0600` 或更严格；
-- 不在日志、命令行、Git 或 README 中保存明文 Token；
+- 服务不启用应用层 Token，必须保持 `127.0.0.1` 监听并通过 SSH 隧道访问；
+- 本部署使用固定的本地任务主体 `local`，请求中的 `code_input.userId` 使用 `local`；
 - 上传能力 URL 单次使用并有过期时间；
 - 模型子进程固定参数列表执行，不拼接 shell 命令；
 - YuE2 代码采用 Apache-2.0；模型权重许可与商业使用条件以官方模型许可证为准。

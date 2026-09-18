@@ -22,6 +22,20 @@ async def test_m01_transport_requires_authentication(runner_mcp):
 
 
 @pytest.mark.asyncio
+async def test_transport_accepts_anonymous_client_when_auth_is_disabled(
+    runner_mcp_no_auth,
+):
+    async with mcp_session(runner_mcp_no_auth, authenticated=False) as (session, _):
+        tools = await session.list_tools()
+    assert {tool.name for tool in tools.tools} == {
+        "runner_upload",
+        "runner_submit",
+        "runner_result",
+        "runner_result_source",
+    }
+
+
+@pytest.mark.asyncio
 async def test_m09_read_retry_never_requeues_task(runner_mcp):
     async with mcp_session(runner_mcp) as (session, _):
         accepted = await session.call_tool(

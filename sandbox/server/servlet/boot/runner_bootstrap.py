@@ -75,7 +75,9 @@ class RunnerBootstrapBaseWeb(Bootstrap):
         self.mcp_integration = None
         if data_root:
             self.music_auth = MusicAuth(
-                music.get("api_keys_file"), music.get("auth_required", True)
+                music.get("api_keys_file"),
+                music.get("auth_required", True),
+                music.get("principal", "local"),
             )
             self.music_store = MusicTaskStore(
                 data_root,
