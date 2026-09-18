@@ -50,6 +50,24 @@ HTTP 或 MCP 上传输入、提交任务、轮询状态和下载产物；模型�
 文件交付说明见 [docs/music-service.md](docs/music-service.md)，AutoDL 使用说明见
 [docs/YuE_AutoDL_README.md](docs/YuE_AutoDL_README.md)。
 
+### 配套 Claude Skill
+
+配套 Skill/Claude plugin 仓库：
+[glide-the/YuE2-skills](https://github.com/glide-the/YuE2-skills)。该仓库负责连接本项目
+提供的 Runner MCP、组织生成/转录/改谱/试听工作流，并提供请求契约和领域参考；它是
+纯客户端，不包含模型处理脚本，所有执行仍由本项目的 Task/Processor 完成。
+
+在 Claude Code 中安装：
+
+```text
+/plugin marketplace add glide-the/YuE2-skills
+/plugin install yue2@yue2-skills
+```
+
+安装后通过 `/mcp` 确认 `yue2-runner` 已连接。插件默认连接
+`http://127.0.0.1:11000/mcp`，因此需要先启动 AutoDL Runner，并建立本机 `11000`
+到服务器 `127.0.0.1:10000` 的 SSH 隧道。
+
 ### 使用示例 1：根据风格和歌词生成歌曲
 
 安装 YuE2 Claude plugin 并连接 `http://127.0.0.1:11000/mcp` 后，可以直接对
