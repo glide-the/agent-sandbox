@@ -16,6 +16,40 @@ Agent Sandbox 是一个灵活的沙箱执行框架，旨在为 AI Agent 提供�
 - **配置灵活**: 通过 YAML 配置文件管理任务和处理器
 - **沙箱隔离**: 为每个任务提供独立的执行环境
 
+## YuE2 Runner 音乐任务
+
+项目提供 YuE2、SheetSage2 与配套音乐工具的 Runner Task/Processor。客户端只通过
+HTTP 或 MCP 上传输入、提交任务、轮询状态和下载产物；模型加载、乐谱处理及试听包
+构建全部发生在 Runner 服务端。
+
+| Task | Processor | 服务端实现 | 用途 |
+| --- | --- | --- | --- |
+| `yue2_task` | `yue2_processor` | `run_yue2.py` | 生成、规划、全模式比较和已有 latent 解码 |
+| `sheetsage2_task` | `sheetsage2_processor` | `transcribe.py` | 将上传音频转录为 ABC/MIDI 等乐谱产物 |
+| `music_score_task` | `music_score_processor` | `abc_tools.py` | 检查 ABC、移除和弦、比较编辑前后音乐事件 |
+| `music_listen_task` | `music_listen_processor` | `listen.py` | 为 1–8 个已完成任务创建可下载的试听比较包 |
+
+官方 YuE2 skill 中的 `common.py` 是这些服务端工具共享的库，不是独立业务操作，
+因此不注册单独 Task。服务端脚本路径和 Python 环境由部署 YAML 固定配置，客户端不能
+提交解释器、脚本、模型目录、服务器文件路径或 shell 命令。
+
+### Runner 与 Skill 的职责边界
+
+- Claude plugin/Skill 是纯 Runner 客户端，不包含或执行 `yue2-music/scripts`，也不加载模型。
+- Runner API 校验用户主体、不可变上传资产、任务产物归属及路径边界。
+- API 将校验后的可信资源映射写入内部 `_service` 元数据，再交给独立 Worker；Worker
+  不依赖 API 进程内的 `bootstrap_cache`，也不信任客户端路径。
+- `music_listen_task` 发布 `comparison_bundle`（`comparison.zip`）、`comparison`
+  （`index.html`）和 `comparison_manifest`（`manifest.json`）。完整页面应下载 ZIP，
+  以保留 HTML 引用的音频和元数据目录结构。
+- `yue2_task` 的旧 `score_check` 入口继续兼容已有客户端；新工作流使用独立的
+  `music_score_task`。
+
+音乐部署示例位于
+[deploy/autodl/sandbox.yue.yaml](deploy/autodl/sandbox.yue.yaml)，完整接口、状态、恢复和
+文件交付说明见 [docs/music-service.md](docs/music-service.md)，AutoDL 使用说明见
+[docs/YuE_AutoDL_README.md](docs/YuE_AutoDL_README.md)。
+
 ## 项目结构
 
 ```
