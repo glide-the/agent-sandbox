@@ -59,16 +59,7 @@ bootstrap:
         path: "/mcp"
         transport: "streamable-http"
         public_base_url: "http://127.0.0.1:11000"
-        allowed_hosts:
-          - "127.0.0.1:10000"
-          - "127.0.0.1:11000"
-          - "localhost:10000"
-          - "localhost:11000"
-        allowed_origins:
-          - "http://127.0.0.1:10000"
-          - "http://127.0.0.1:11000"
-          - "http://localhost:10000"
-          - "http://localhost:11000"
+        dns_rebinding_protection: false
         tools:
           - "runner_upload"
           - "runner_submit"
