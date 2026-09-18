@@ -71,7 +71,7 @@ SDK 固定为 MCP Python SDK 1.x 维护线，以兼容设计规定的 2025-11-25
 生成 `index.html`、`manifest.json` 与可完整下载的 `comparison.zip` 比较包。Skill 只提交任务和下载产物，
 不会在客户端运行 `listen.py`。
 
-客户端不得发送 `_service`。该字段由 API 在鉴权、资源绑定和持久化任务 ID 创建之后注入；API 和 Worker 两次 `prepare` 必须得到同一个任务 ID。
+客户端不得发送 `_service`。该字段由 API 在鉴权、资源绑定和持久化任务 ID 创建之后注入；API 会把已完成归属与路径校验的资源映射一并交给独立 Worker，Worker 不依赖 API 进程内存，也不接受客户端服务器路径。API 和 Worker 两次 `prepare` 必须得到同一个任务 ID。
 
 ### 查询与下载
 

@@ -97,31 +97,13 @@ def _execution_profile(task_name: str) -> str:
     )
 
 
-def _iter_resource_refs(submission):
-    if isinstance(submission, SheetSage2Submission):
-        yield ResourceRef(asset_id=submission.audio_asset_id)
-        return
-    if isinstance(submission, MusicListenSubmission):
-        return
-    if isinstance(submission, MusicScoreSubmission):
-        yield submission.check.source
-        if submission.check.after:
-            yield submission.check.after
-        return
-    if submission.abc_source:
-        yield submission.abc_source
-    if submission.check:
-        yield submission.check.source
-        if submission.check.after:
-            yield submission.check.after
-
-
-def _validate_resource_ref(bootstrap, owner_id: str, reference: ResourceRef) -> None:
+def _resolve_resource_ref(bootstrap, owner_id: str, reference: ResourceRef) -> str:
     if reference.asset_id:
-        bootstrap.asset_store.resolve_uploaded_asset(
-            owner_id=owner_id, asset_id=reference.asset_id
+        return str(
+            bootstrap.asset_store.resolve_uploaded_asset(
+                owner_id=owner_id, asset_id=reference.asset_id
+            )
         )
-        return
     record = bootstrap.music_store.read(reference.task_id)
     authorize_music_resource(record["owner_id"], owner_id)
     state = bootstrap.music_store.recover_state(reference.task_id)
@@ -136,24 +118,68 @@ def _validate_resource_ref(bootstrap, owner_id: str, reference: ResourceRef) -> 
     )
     if result.get("delivery_status") != "ready" or artifact is None:
         raise KeyError(reference.result_source_name)
+    task_dir = bootstrap.music_store.task_dir(reference.task_id).resolve(strict=True)
+    candidate = task_dir / artifact["relative_path"]
+    if candidate.is_symlink():
+        raise PermissionError("task output escaped its task directory")
+    path = candidate.resolve(strict=True)
+    if task_dir not in path.parents:
+        raise PermissionError("task output escaped its task directory")
+    return str(path)
 
 
-def _validate_music_resources(bootstrap, owner_id: str, submission) -> None:
-    for reference in _iter_resource_refs(submission):
-        _validate_resource_ref(bootstrap, owner_id, reference)
-    if isinstance(submission, YuE2Submission) and submission.source_task_id:
-        record = bootstrap.music_store.read(submission.source_task_id)
-        authorize_music_resource(record["owner_id"], owner_id)
-        source_state = bootstrap.music_store.recover_state(submission.source_task_id)
-        if (source_state.get("result") or {}).get("delivery_status") != "ready":
-            raise ValueError("decode source task is not ready")
+def _resolve_native_task(bootstrap, owner_id: str, task_id: str) -> str:
+    record = bootstrap.music_store.read(task_id)
+    authorize_music_resource(record["owner_id"], owner_id)
+    state = bootstrap.music_store.recover_state(task_id)
+    if (state.get("result") or {}).get("delivery_status") != "ready":
+        raise ValueError(f"source task is not ready: {task_id}")
+    task_dir = bootstrap.music_store.task_dir(task_id).resolve(strict=True)
+    native = (task_dir / "artifacts" / "native").resolve(strict=True)
+    if task_dir not in native.parents or not native.is_dir():
+        raise PermissionError("native task result escaped its task directory")
+    return str(native)
+
+
+def _resolve_music_resources(bootstrap, owner_id: str, submission) -> dict:
+    resolved: dict[str, str | list[str]] = {}
+    if isinstance(submission, SheetSage2Submission):
+        resolved["audio_asset"] = _resolve_resource_ref(
+            bootstrap, owner_id, ResourceRef(asset_id=submission.audio_asset_id)
+        )
+        return resolved
+    if isinstance(submission, MusicScoreSubmission):
+        resolved["score_source"] = _resolve_resource_ref(
+            bootstrap, owner_id, submission.check.source
+        )
+        if submission.check.after:
+            resolved["score_after"] = _resolve_resource_ref(
+                bootstrap, owner_id, submission.check.after
+            )
+        return resolved
     if isinstance(submission, MusicListenSubmission):
-        for task_id in submission.source_task_ids:
-            record = bootstrap.music_store.read(task_id)
-            authorize_music_resource(record["owner_id"], owner_id)
-            source_state = bootstrap.music_store.recover_state(task_id)
-            if (source_state.get("result") or {}).get("delivery_status") != "ready":
-                raise ValueError(f"listening source task is not ready: {task_id}")
+        resolved["source_tasks"] = [
+            _resolve_native_task(bootstrap, owner_id, task_id)
+            for task_id in submission.source_task_ids
+        ]
+        return resolved
+    if submission.abc_source:
+        resolved["abc_source"] = _resolve_resource_ref(
+            bootstrap, owner_id, submission.abc_source
+        )
+    if isinstance(submission, YuE2Submission) and submission.source_task_id:
+        resolved["source_task"] = _resolve_native_task(
+            bootstrap, owner_id, submission.source_task_id
+        )
+    if submission.check:
+        resolved["score_source"] = _resolve_resource_ref(
+            bootstrap, owner_id, submission.check.source
+        )
+        if submission.check.after:
+            resolved["score_after"] = _resolve_resource_ref(
+                bootstrap, owner_id, submission.check.after
+            )
+    return resolved
 
 
 def _public_music_state(state: dict) -> dict:
@@ -251,7 +277,9 @@ async def submit_for_principal(
         try:
             submission = parse_music_submission(task_name, public_payload)
             authorize_music_resource(submission.code_input.userId, principal)
-            _validate_music_resources(bootstrap, principal, submission)
+            resolved_resources = _resolve_music_resources(
+                bootstrap, principal, submission
+            )
             record, created = bootstrap.music_store.create_or_get(
                 owner_id=principal,
                 idempotency_key=idempotency_key,
@@ -285,6 +313,7 @@ async def submit_for_principal(
             "owner_id": principal,
             "request_digest": record["request_digest"],
             "execution_profile_digest": record["execution_profile_digest"],
+            "resolved_resources": resolved_resources,
         }
         payload.payload = public_payload
         runner = task.prepare(payload=payload)

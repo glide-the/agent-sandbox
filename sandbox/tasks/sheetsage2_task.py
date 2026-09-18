@@ -7,7 +7,6 @@ import inspect
 from sandbox.common.registry import registry
 from sandbox.processors import get_processors
 from sandbox.processors.sheetsage2_processor import SheetSage2Processor
-from sandbox.server.bootstrap.bootstrap_register import get_bootstrap
 from sandbox.server.model.flow_data import PayLoad
 from sandbox.server.model.music import SheetSage2Submission
 from sandbox.tasks.base_task import FlowData, Runner, SandboxTaskAbstract
@@ -60,13 +59,10 @@ class SheetSage2Task(SandboxTaskAbstract):
             state="dispatch_sheetsage2_task",
             result={"stage": "preparing"},
         )
-        bootstrap = get_bootstrap("runner_bootstrap_web")
-        source = bootstrap.asset_store.resolve_uploaded_asset(
-            owner_id=submission.service.owner_id,
-            asset_id=submission.audio_asset_id,
-        )
         result = self.processor(
-            submission, runner.task_id, {"audio_asset": str(source)}
+            submission,
+            runner.task_id,
+            submission.service.resolved_resources,
         )
         if inspect.isawaitable(result):
             result = await result
