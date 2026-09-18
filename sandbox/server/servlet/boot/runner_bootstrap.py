@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from sandbox.common.registry import registry
 from sandbox.server.bootstrap.base import Bootstrap
 from sandbox.server.bootstrap.bootstrap_register import bootstrap_register
-from sandbox.server.mcp_api import create_runner_mcp
+from sandbox.server.mcp_api import ExactMCPPathMiddleware, create_runner_mcp
 from sandbox.server.model.flow_data import PayLoad
 from sandbox.server.model.result import BaseResponse
 from sandbox.server.music_auth import MusicAuth
@@ -229,6 +229,9 @@ class RunnerBootstrapBaseWeb(Bootstrap):
         )
 
         if self.mcp_integration is not None:
+            self.app.add_middleware(
+                ExactMCPPathMiddleware, path=self.mcp_integration.mount_path
+            )
             capability_path = str(
                 self.mcp_config.get("upload_capability_path", "/api/uploads/{token}")
             )

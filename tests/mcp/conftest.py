@@ -12,7 +12,7 @@ from mcp.client.streamable_http import streamable_http_client
 from sandbox.processors.sheetsage2_processor import SheetSage2Processor
 from sandbox.processors.yue2_processor import YuE2Processor
 from sandbox.server.bootstrap.bootstrap_register import bootstrap_cache
-from sandbox.server.mcp_api import create_runner_mcp
+from sandbox.server.mcp_api import ExactMCPPathMiddleware, create_runner_mcp
 from sandbox.server.servlet.boot.runner_bootstrap import RunnerBootstrapBaseWeb
 from sandbox.server.servlet.extract_file import upload_runner_file
 from sandbox.server.servlet.runner import (
@@ -99,6 +99,7 @@ def _build_runner_mcp(tmp_path, *, auth_required: bool):
         return await integration.capabilities.receive(token=token, request=request)
 
     app.put("/api/uploads/{token}")(receive)
+    app.add_middleware(ExactMCPPathMiddleware, path="/mcp")
     app.mount("/mcp", integration.app)
     return {
         "app": app,
@@ -130,7 +131,7 @@ async def mcp_session(fixture, *, authenticated=True):
             headers=headers,
         ) as client:
             async with streamable_http_client(
-                "http://testserver/mcp/", http_client=client
+                "http://testserver/mcp", http_client=client
             ) as (read, write, _):
                 async with ClientSession(read, write) as session:
                     await session.initialize()
