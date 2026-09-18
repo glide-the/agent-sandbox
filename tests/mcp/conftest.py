@@ -25,8 +25,7 @@ from sandbox.tasks.sheetsage2_task import SheetSage2Task
 from sandbox.tasks.yue2_task import YuE2Task
 
 
-@pytest.fixture
-def runner_mcp(tmp_path):
+def _build_runner_mcp(tmp_path, *, auth_required: bool):
     token = "runner-secret"
     keys = tmp_path / "keys.json"
     keys.write_text(
@@ -40,8 +39,9 @@ def runner_mcp(tmp_path):
         max_ongoing_tasks=1,
         music={
             "data_root": str(tmp_path / "data"),
-            "api_keys_file": str(keys),
-            "auth_required": True,
+            "api_keys_file": str(keys) if auth_required else None,
+            "auth_required": auth_required,
+            "principal": "alice",
         },
         upload={"data_root": str(tmp_path / "data"), "max_input_bytes": 64},
     )
@@ -106,6 +106,16 @@ def runner_mcp(tmp_path):
         "token": token,
         "headers": {"Authorization": f"Bearer {token}"},
     }
+
+
+@pytest.fixture
+def runner_mcp(tmp_path):
+    return _build_runner_mcp(tmp_path, auth_required=True)
+
+
+@pytest.fixture
+def runner_mcp_no_auth(tmp_path):
+    return _build_runner_mcp(tmp_path, auth_required=False)
 
 
 @contextlib.asynccontextmanager

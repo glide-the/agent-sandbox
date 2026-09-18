@@ -48,8 +48,8 @@ bootstrap:
       finished_task_remove_timeout: 10000
       music:
         data_root: "/root/agent-sandbox-data"
-        api_keys_file: "/root/agent-sandbox-data/secrets/music-api-keys.json"
-        auth_required: true
+        auth_required: false
+        principal: "local"
         retention_seconds: 604800
       upload:
         data_root: "/root/agent-sandbox-data"
