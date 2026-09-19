@@ -14,12 +14,12 @@
 | Admin | `main` | [glide-the/dream-im-platform](https://github.com/glide-the/dream-im-platform/releases/tag/autodl-yue-2026.09.19) |
 | Python SDK | `main` | [glide-the/ink-claude-dream-agent-sdk-python](https://github.com/glide-the/ink-claude-dream-agent-sdk-python/releases/tag/autodl-yue-2026.09.19) |
 | Claude Runtime | `main` | [glide-the/ink-claude-code-dream](https://github.com/glide-the/ink-claude-code-dream/releases/tag/autodl-yue-2026.09.19) |
-| Agent Sandbox / YuE Runner | `main` | [glide-the/agent-sandbox](https://github.com/glide-the/agent-sandbox/releases/tag/autodl-yue-2026.09.19.2) |
+| Agent Sandbox / YuE Runner | `main` | [glide-the/agent-sandbox](https://github.com/glide-the/agent-sandbox/releases/tag/autodl-yue-2026.09.19.3) |
 | YuE2 Claude Skill | `main` | [glide-the/YuE2-skills](https://github.com/glide-the/YuE2-skills/releases/tag/autodl-yue-2026.09.19) |
 
 这是 GitHub 源码与镜像部署快照，不会替代各包管理器的版本：Python SDK 仍为 `0.2.145`，Claude Runtime 仍为 `0.1.10`；该协调标签不会重复发布 PyPI 或 npm 制品。镜像更新后仍应以 `/root/ink-autodl/admin/current`、`/root/ink-autodl/dream/current` 和健康检查结果确认实例实际采用的版本。
 
-Agent Sandbox 使用补丁标签 `autodl-yue-2026.09.19.2`；该补丁把一键启动、Runner 启动和停止脚本的 Unix 可执行位纳入发布制品，并让 Runner 主进程与 `web_runner` worker 使用同一个独立进程组，停止时完整回收；不改变 Runner API、任务、配置或模型环境。
+Agent Sandbox 使用补丁标签 `autodl-yue-2026.09.19.3`；该补丁包含一键启动、Runner 进程组完整回收和 Dream 用户自行配置 MCP 的说明；不改变 Runner API、任务、配置或模型环境。
 
 ## 快速开始
 
@@ -76,7 +76,23 @@ Dream 的默认对话／Claude Agent 模型不是镜像内置常量，首次使�
 
 > **不要混淆两类模型：** `/root/checkpoint/YuE2-3B` 是 YuE Runner 的本地音乐生成权重；Admin“AI 模型中心”配置的是 Dream／Claude Agent 经 Gateway 调用的对话模型。配置或替换 YuE2 的 `model.safetensors` 不会自动创建 Dream 默认模型。
 
-### 第四步：连接 YuE Runner
+### 第四步：Dream 用户注册并配置 MCP
+
+每位用户在 `WebUI-6006` 完成 Dream 注册并登录后，都需要为自己的账号配置 MCP。MCP 服务是用户级资源，不会因为镜像已经启动、Admin 已配置默认模型，或其他用户已经添加过同名服务而自动出现在当前账号中。
+
+按以下步骤添加镜像内的 YuE Runner：
+
+1. 在 Dream 打开 **设置 → Work → Resource links（资源链接）**。
+2. 找到 **Claude MCP 资源**，点击 **＋ 添加 MCP 服务**。
+3. MCP 服务名称填写 `YuE2`。
+4. 传输方式选择 **Streamable HTTP**。
+5. MCP 服务 URL 填写 `http://127.0.0.1:10000/mcp`。
+6. 点击 **添加 MCP 服务**，然后进入该服务的 **管理与工具** 页面，等待 Dream 加载能力清单。
+7. 确认 Tools 中可以看到 `runner_upload`、`runner_submit`、`runner_result` 和 `runner_result_source` 后，再开始对话任务。
+
+这里的 `127.0.0.1:10000` 由 AutoDL 实例内的 Dream 后端访问同机 YuE Runner，不是用户浏览器自身的回环地址。该 Runner 不要求应用层 Token；如果页面长期显示“等待检测连接”，先确认统一启动脚本已经执行、Runner `/openapi.json` 返回 200，再进入“管理与工具”重试加载。删除 MCP 服务只会删除当前 Dream 用户的连接配置，不会停止 Runner，也不会影响其他用户。
+
+### 第五步：为外部客户端连接 YuE Runner
 
 Runner 只监听实例的 `127.0.0.1:10000`。当 AutoDL 未给 10000 配置应用服务入口时，在本机建立端口转发：
 
@@ -142,7 +158,7 @@ Runner MCP 提供 `runner_upload`、`runner_submit`、`runner_result` 和 `runne
 /plugin install yue2@yue2-skills
 ```
 
-安装后通过 `/mcp` 确认 `yue2-runner` 已连接。插件默认连接 `http://127.0.0.1:11000/mcp`，因此必须先运行统一启动脚本，并按“第四步：连接 YuE Runner”建立本机 `11000` 到实例 `127.0.0.1:10000` 的 SSH 隧道。
+安装后通过 `/mcp` 确认 `yue2-runner` 已连接。插件默认连接 `http://127.0.0.1:11000/mcp`，因此必须先运行统一启动脚本，并按“第五步：为外部客户端连接 YuE Runner”建立本机 `11000` 到实例 `127.0.0.1:10000` 的 SSH 隧道。Dream 网页中的用户级 MCP 配置与 Claude Code 插件配置彼此独立；使用哪一个客户端，就需要在对应客户端完成一次连接配置。
 
 ### Runner 与 Skill 的调用规则
 
